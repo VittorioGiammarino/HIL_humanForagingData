@@ -1101,8 +1101,8 @@ def HMM_order_estimation(d, EV):
         
         print('Expectation done')
         print('Starting maximization step')
-        optimizer = keras.optimizers.Adamax(learning_rate=1e-4)
-        epochs = 100 #number of iterations for the maximization step
+        optimizer = keras.optimizers.Adamax(learning_rate=1e-3)
+        epochs = 50 #number of iterations for the maximization step
     
         gamma_tilde_reshaped = GammaTildeReshape(gamma_tilde, EV.option_space)
         gamma_actions_false, gamma_actions_true = GammaReshapeActions(T, EV.option_space, EV.action_space, gamma, labels_reshaped)
