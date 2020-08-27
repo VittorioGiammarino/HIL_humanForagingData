@@ -17,6 +17,23 @@ import tensorflow.keras.backend as kb
 import concurrent.futures
 import csv
 
+def WaterLocation(folder_name):
+    f = open('{}/water_locations.csv'.format(folder_name))
+    water_locations = csv.reader(f)
+
+    locations = np.empty((0,2))
+
+    for row in water_locations:
+        try:
+            temp = np.empty((1,2))
+            temp[0,:] = [row[1],row[2]]
+            if int(row[0])==1:
+                locations = np.append(locations, temp, 0)
+        except:
+            print('the data type is not a float')
+            
+    return locations
+
 def PreprocessData(folder_name, action_space):
     
     action_range = 360/action_space
@@ -102,7 +119,10 @@ def EvaluateActionSpaceDiscretization(Expert_trajs):
 
 def NN_options(option_space,size_input):
     model = keras.Sequential([
-    keras.layers.Dense(300, activation='relu', input_shape=(size_input,)),
+    keras.layers.Dense(1024, activation='relu', input_shape=(size_input,)),
+    keras.layers.Dense(512, activation='relu'),
+    keras.layers.Dense(256, activation='relu'),
+    keras.layers.Dense(128, activation='relu'),
     keras.layers.Dense(option_space),
     keras.layers.Softmax()
     ])
@@ -116,7 +136,10 @@ def NN_options(option_space,size_input):
 
 def NN_actions(action_space, size_input):
     model = keras.Sequential([
-    keras.layers.Dense(300, activation='relu', input_shape=(size_input+1,)),
+    keras.layers.Dense(1024, activation='relu', input_shape=(size_input+1,)),
+    keras.layers.Dense(512, activation='relu'),
+    keras.layers.Dense(256, activation='relu'),
+    keras.layers.Dense(128, activation='relu'),
     keras.layers.Dense(action_space),
     keras.layers.Softmax()
     ])
@@ -130,7 +153,10 @@ def NN_actions(action_space, size_input):
 
 def NN_termination(termination_space, size_input):
     model = keras.Sequential([
-    keras.layers.Dense(300, activation='relu', input_shape=(size_input+1,)),
+    keras.layers.Dense(1024, activation='relu', input_shape=(size_input+1,)),
+    keras.layers.Dense(512, activation='relu'),
+    keras.layers.Dense(256, activation='relu'),
+    keras.layers.Dense(128, activation='relu'),
     keras.layers.Dense(termination_space),
     keras.layers.Softmax()
     ])
@@ -739,7 +765,7 @@ def BaumWelch(EV, lambdas, eta):
     TrainingSet_Actions, labels_reshaped = TrainingAndLabelsReshaped(EV.option_space,T, EV.TrainingSet, EV.labels, EV.size_input)
 
     for n in range(EV.N):
-        print('iter', n, '/', EV.N)
+        print('iter', n+1, '/', EV.N)
         
         alpha = Alpha(EV.TrainingSet, EV.labels, EV.option_space, EV.termination_space, EV.mu, 
                       EV.zeta, NN_Options, NN_Actions, NN_Termination)
@@ -1102,7 +1128,7 @@ def HMM_order_estimation(d, EV):
         print('Expectation done')
         print('Starting maximization step')
         optimizer = keras.optimizers.Adamax(learning_rate=1e-3)
-        epochs = 50 #number of iterations for the maximization step
+        epochs = 30 #number of iterations for the maximization step
     
         gamma_tilde_reshaped = GammaTildeReshape(gamma_tilde, EV.option_space)
         gamma_actions_false, gamma_actions_true = GammaReshapeActions(T, EV.option_space, EV.action_space, gamma, labels_reshaped)
@@ -1141,7 +1167,7 @@ class Triple:
     
 class Experiment_design:
     def __init__(self, labels, TrainingSet, size_input, action_space, option_space, termination_space, N, zeta, mu, Triple_init, gain_lambdas,
-                  gain_eta, env, max_epoch):
+                  gain_eta, env, max_epoch, speed, time):
         self.labels = labels
         self.TrainingSet = TrainingSet
         self.size_input = size_input
@@ -1156,6 +1182,8 @@ class Experiment_design:
         self.gain_eta = gain_eta
         self.env = env
         self.max_epoch = max_epoch
+        self.speed = speed
+        self.time = time
     
 
 
