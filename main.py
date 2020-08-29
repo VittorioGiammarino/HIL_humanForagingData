@@ -120,7 +120,7 @@ model3 = bc.NN3(action_space, size_input)
 model_BC = tf.keras.models.load_model('Variables_saved/BehavioralCloning/model1_action{}'.format(action_space))
 
 # %% Initialization
-option_space = 3
+option_space = 4
 # action space
 termination_space = 2
 size_input = TrainingSet.shape[1]
@@ -129,8 +129,8 @@ NN_options = hil.NN_options(option_space, size_input)
 NN_actions = hil.NN_actions(action_space, size_input)
 NN_termination = hil.NN_termination(termination_space, size_input)
 
-N=3 #Iterations
-zeta = 0.1 #Failure factor
+N=5 #Iterations
+zeta = 0.001 #Failure factor
 mu = np.ones(option_space)*np.divide(1,option_space) #initial option probability distribution
 
 gain_lambdas = np.logspace(0, 1.5, 4, dtype = 'float32')
@@ -151,6 +151,11 @@ lambdas = tf.Variable(initial_value=1.*tf.ones((option_space,)), trainable=False
 eta = tf.Variable(initial_value=100., trainable=False)   
     
 # %%
+
+# simn = 3
+# Writer = anim.writers['ffmpeg']
+# writer = Writer(fps=30, metadata=dict(artist='Me'), bitrate=3800)
+
 # x,u = sim.VideoFlatPolicy(model_BC,ED.max_epoch,ED.size_input,Labels_dict_rad, ED.speed, ED.time)
 
 # fig = plt.figure()                                                    
@@ -160,7 +165,7 @@ eta = tf.Variable(initial_value=100., trainable=False)
 # plot_water = plt.plot(water_locations[:,0], water_locations[:,1], 'bx')
 # plt.xlabel('x')
 # plt.ylabel('y')
-# plt.savefig('Figures/FiguresBC/BCpolicy_{}and{}_ActionSpace{}.eps'.format(folder_name,folder_name2,action_space), format='eps')
+# plt.savefig('Figures/FiguresBC/BCpolicy_{}and{}_ActionSpace{}_sim{}.eps'.format(folder_name,folder_name2,action_space,simn), format='eps')
 
 # def animation_frame_BC(i, x, o):
 #     plot_action.set_offsets(x[0:i,:]*1000)
@@ -169,11 +174,70 @@ eta = tf.Variable(initial_value=100., trainable=False)
 #     return plot_action
 
 # animation = anim.FuncAnimation(fig, func = animation_frame_BC, frames=x.shape[0], fargs=(x, ED.time))
-# animation.save('Videos/VideosBC/BCpolicy_{}and{}_ActionSpace{}.mp4'.format(folder_name,folder_name2,action_space), writer=writer)
+# animation.save('Videos/VideosBC/BCpolicy_{}and{}_ActionSpace{}_sim{}.mp4'.format(folder_name,folder_name2,action_space,simn), writer=writer)
 
+# %% Hard_coded expert policy 
+
+option_spaceHC=4
+muHC = np.array([1/4, 1/4, 1/4, 1/4])
+time = Expert_trajs[traj][:,1]
+speed = Expert_trajs[traj][:,6]
+tol = 10
+[trajHC, controlHC, OptionHC, 
+ TerminationHC] = sim.HardCoded_policy(zeta, muHC, max_epoch, 100, option_spaceHC, action_space, size_input, Labels_dict_rad, speed, time, tol, water_locations)
+
+
+fig = plt.figure()                                                    
+plot_action = plt.scatter(trajHC[0][:,0], trajHC[0][:,1], c=ED.time, marker='o', cmap='cool');
+cbar = fig.colorbar(plot_action, ticks=[10, 50, 130])
+cbar.ax.set_yticklabels(['10sec', '50sec', '130sec'])
+plot_water = plt.plot(water_locations[:,0], water_locations[:,1], 'bx')
+plt.xlabel('x')
+plt.ylabel('y')
+
+
+fig = plt.figure()
+ax1 = plt.subplot(311)
+plot_action = plt.scatter(trajHC[0][:,0], trajHC[0][:,1], c=OptionHC[0][1:], marker='x', cmap='Set1');
+cbar = fig.colorbar(plot_action, ticks=[0, 1, 2, 3])
+plot_water = plt.plot(water_locations[:,0], water_locations[:,1], 'bx')
+cbar.ax.set_yticklabels(['Option1', 'Option2', 'Option3', 'Option4'])
+plt.xlabel('x')
+plt.ylabel('y')
+plt.setp(ax1.get_xticklabels(), visible=False)
+ax2 = plt.subplot(312, sharex=ax1)
+plot_option = plt.scatter(trajHC[0][:-1,0], trajHC[0][:-1,1], c=controlHC[0], marker='x', cmap='Set1');
+cbar = fig.colorbar(plot_option, ticks=[0, 1, 2, 3, 4, 5, 6, 7])
+plot_water = plt.plot(water_locations[:,0], water_locations[:,1], 'bx')
+cbar.ax.set_yticklabels(['0°', '45°', '90°', '135°', '180°', '225°', '270°', '315°'])
+plt.xlabel('x')
+plt.ylabel('y')
+plt.setp(ax2.get_xticklabels(), visible=False)
+ax3 = plt.subplot(313, sharex=ax1)
+plot_termination = plt.scatter(trajHC[0][:,0], trajHC[0][:,1], c=TerminationHC[0], marker='x', cmap='copper');
+cbar = fig.colorbar(plot_termination, ticks=[0, 1])
+plot_water = plt.plot(water_locations[:,0], water_locations[:,1], 'bx')
+cbar.ax.set_yticklabels(['Same Option', 'Terminate'])
+plt.xlabel('x')
+plt.ylabel('y')
+
+# %% Collect data and labels from HC-policy
+
+dataHC = np.empty((0,2))
+labelsHC = np.empty((0))
+
+for i in range(len(trajHC)):
+    dataHC = np.append(dataHC, trajHC[i][:-1,:]/1000,0)
+    labelsHC = np.append(labelsHC, controlHC[i])
+   
+ED.TrainingSet = dataHC
+ED.labels = labelsHC    
+   
 # %% HMM order estimation
 
 Likelihood = np.empty(0) 
+
+
 # %%
 Model_orders = [2]
 
@@ -232,8 +296,9 @@ success_percentageBW = np.divide(np.sum(flagBW),len(length_traj))
 
 fig = plt.figure()                                                    
 plot_action = plt.scatter(xBW[:]*1000, yBW[:]*1000, c=optionsBW[:], marker='o', cmap='Set1');
-cbar = fig.colorbar(plot_action, ticks=[0, 1, 2])
-cbar.ax.set_yticklabels(['Option1', 'Option2', 'Option3'])
+cbar = fig.colorbar(plot_action, ticks=[0, 1, 2, 3])
+cbar.ax.set_yticklabels(['Option1', 'Option2', 'Option3', 'Option4'])
+plot_water = plt.plot(water_locations[:,0], water_locations[:,1], 'bx')
 plt.xlabel('x')
 plt.ylabel('y')
 plt.savefig('Figures/FiguresHIL/HILpolicy_options_{}_traj{}_ActionSpace{}.eps'.format(folder_name,traj,action_space), format='eps')
@@ -242,6 +307,7 @@ fig = plt.figure()
 plot_action = plt.scatter(xBW[:]*1000, yBW[:]*1000, c=actionBW[:], marker='o', cmap='Set1');
 cbar = fig.colorbar(plot_action, ticks=[0, 1, 2, 3, 4, 5, 6, 7])
 cbar.ax.set_yticklabels(['0°', '45°', '90°', '135°', '180°', '225°', '270°', '315°'])
+plot_water = plt.plot(water_locations[:,0], water_locations[:,1], 'bx')
 plt.xlabel('x')
 plt.ylabel('y')
 plt.savefig('Figures/FiguresHIL/HILpolicy_actions_{}_traj{}_ActionSpace{}.eps'.format(folder_name,traj,action_space), format='eps')
@@ -250,14 +316,19 @@ fig = plt.figure()
 plot_action = plt.scatter(xBW[:]*1000, yBW[:]*1000, c=terminationsBW[:], marker='o', cmap='copper');
 cbar = fig.colorbar(plot_action, ticks=[0, 1])
 cbar.ax.set_yticklabels(['Same Option', 'Terminate'])
+plot_water = plt.plot(water_locations[:,0], water_locations[:,1], 'bx')
 plt.xlabel('x')
 plt.ylabel('y')
 plt.savefig('Figures/FiguresHIL/HILpolicy_termination_{}_traj{}_ActionSpace{}.eps'.format(folder_name,traj,action_space), format='eps')
                                                     
 # %%
 
-x, u, o, b = sim.VideoHierarchicalPolicy(Trained_triple, ED.zeta, ED.mu, ED.max_epoch, ED.option_space, ED.size_input, 
-                                                    Labels_dict_rad, ED.speed, ED.time)
+speed2 = 0.6*np.ones((6000,1))
+time2 = np.linspace(0,3000,6000)
+max_epoch2 = 6000
+
+x, u, o, b = sim.VideoHierarchicalPolicy(Trained_triple, ED.zeta, ED.mu, max_epoch2, ED.option_space, ED.size_input, 
+                                                    Labels_dict_rad, speed2, time2)
     
 # %%
 
@@ -267,8 +338,9 @@ writer = Writer(fps=30, metadata=dict(artist='Me'), bitrate=3800)
 fig = plt.figure()
 ax1 = plt.subplot(311)
 plot_action = plt.scatter(x[:,0]*1000, x[:,1]*1000, c=o[1:], marker='x', cmap='Set1');
-cbar = fig.colorbar(plot_action, ticks=[0, 1, 2])
-cbar.ax.set_yticklabels(['Option1', 'Option2', 'Option3'])
+cbar = fig.colorbar(plot_action, ticks=[0, 1, 2, 3])
+cbar.ax.set_yticklabels(['Option1', 'Option2', 'Option3', 'Option4'])
+plot_water = plt.plot(water_locations[:,0], water_locations[:,1], 'bx')
 plt.xlabel('x')
 plt.ylabel('y')
 plt.setp(ax1.get_xticklabels(), visible=False)
@@ -276,6 +348,7 @@ ax2 = plt.subplot(312, sharex=ax1)
 plot_option = plt.scatter(x[0:-1,0]*1000, x[0:-1,1]*1000, c=u, marker='x', cmap='Set1');
 cbar = fig.colorbar(plot_option, ticks=[0, 1, 2, 3, 4, 5, 6, 7])
 cbar.ax.set_yticklabels(['0°', '45°', '90°', '135°', '180°', '225°', '270°', '315°'])
+plot_water = plt.plot(water_locations[:,0], water_locations[:,1], 'bx')
 plt.xlabel('x')
 plt.ylabel('y')
 plt.setp(ax2.get_xticklabels(), visible=False)
@@ -283,6 +356,7 @@ ax3 = plt.subplot(313, sharex=ax1)
 plot_termination = plt.scatter(x[:,0]*1000, x[:,1]*1000, c=b, marker='x', cmap='copper');
 cbar = fig.colorbar(plot_termination, ticks=[0, 1])
 cbar.ax.set_yticklabels(['Same Option', 'Terminate'])
+plot_water = plt.plot(water_locations[:,0], water_locations[:,1], 'bx')
 plt.xlabel('x')
 plt.ylabel('y')
 plt.savefig('Figures/FiguresHIL/HILpolicy_subfigs_{}_traj{}_ActionSpace{}.eps'.format(folder_name,traj,action_space), format='eps')

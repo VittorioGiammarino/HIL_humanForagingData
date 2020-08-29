@@ -119,10 +119,7 @@ def EvaluateActionSpaceDiscretization(Expert_trajs):
 
 def NN_options(option_space,size_input):
     model = keras.Sequential([
-    keras.layers.Dense(1024, activation='relu', input_shape=(size_input,)),
-    keras.layers.Dense(512, activation='relu'),
-    keras.layers.Dense(256, activation='relu'),
-    keras.layers.Dense(128, activation='relu'),
+    keras.layers.Dense(300, activation='relu', input_shape=(size_input,)),
     keras.layers.Dense(option_space),
     keras.layers.Softmax()
     ])
@@ -136,10 +133,7 @@ def NN_options(option_space,size_input):
 
 def NN_actions(action_space, size_input):
     model = keras.Sequential([
-    keras.layers.Dense(1024, activation='relu', input_shape=(size_input+1,)),
-    keras.layers.Dense(512, activation='relu'),
-    keras.layers.Dense(256, activation='relu'),
-    keras.layers.Dense(128, activation='relu'),
+    keras.layers.Dense(300, activation='relu', input_shape=(size_input+1,)),
     keras.layers.Dense(action_space),
     keras.layers.Softmax()
     ])
@@ -153,10 +147,7 @@ def NN_actions(action_space, size_input):
 
 def NN_termination(termination_space, size_input):
     model = keras.Sequential([
-    keras.layers.Dense(1024, activation='relu', input_shape=(size_input+1,)),
-    keras.layers.Dense(512, activation='relu'),
-    keras.layers.Dense(256, activation='relu'),
-    keras.layers.Dense(128, activation='relu'),
+    keras.layers.Dense(300, activation='relu', input_shape=(size_input+1,)),
     keras.layers.Dense(termination_space),
     keras.layers.Softmax()
     ])
@@ -1186,6 +1177,89 @@ class Experiment_design:
         self.time = time
     
 
+class HardCoded_policy:
+        
+    
+    def pi_hi(state, water_locations, option_space):
+        
+        water_clusters= [[None]*1 for _ in range(4)]
+        
+        water_clusters[0] = water_locations[0:7,:]
+        water_clusters[1] = water_locations[7:14,:]
+        water_clusters[2] = water_locations[14:21,:]
+        water_clusters[3] = water_locations[21:,:]
+        
+        if state[0,0]>0 and state[0,1]>0:
+            o = 1
+        elif state[0,0]>0 and state[0,1]<0:
+            o = 3
+        elif state[0,0]<0 and state[0,1]<0:
+            o = 2
+        elif state[0,0]<=0 and state[0,1]>=0:
+            o = 0
+            
+        encoded = tf.keras.utils.to_categorical(o,option_space)
+        
+        return encoded
+        
+        
+        
+    def pi_lo(state, o, water_locations, action_space, tol, selected_water):
+        
+        water_clusters= [[None]*1 for _ in range(4)]
+        
+        water_clusters[0] = water_locations[0:7,:]
+        water_clusters[1] = water_locations[7:14,:]
+        water_clusters[2] = water_locations[14:21,:]
+        water_clusters[3] = water_locations[21:,:]
+                
+        if np.abs(np.sum(water_clusters[o][selected_water,:]-state)) > tol:
+            angle = (np.arctan2((water_clusters[o][selected_water,1]-state[0,1]),(water_clusters[o][selected_water,0]-state[0,0]))*180)/np.pi
+        else:
+            selected_water += 1
+            if selected_water == 7:
+                selected_water = 0
+            angle = (np.arctan2((water_clusters[o][selected_water,1]-state[0,1]),(water_clusters[o][selected_water,0]-state[0,0]))*180)/np.pi
+        
+        if angle < 0:
+            angle = 360 + angle
+        
+        action_range = 360/action_space
+        # determine ganularity of the action space
+        actions = np.zeros(1)
+        actions_rad = np.zeros(1)
+        actions_slots = (action_range/2)*np.ones(1)
 
+        for i in range(action_space):
+            step = action_range
+            step_rad = np.divide((step)*np.pi,180)
+            actions = np.append(actions, actions[i]+step)
+            actions_rad = np.append(actions_rad, actions_rad[i]+step_rad)
+            actions_slots = np.append(actions_slots, actions_slots[i]+step)
+            
+        index = np.amin(np.where(angle<actions_slots))
+        if actions[index] == 360:
+            index = 0
+        encoded = tf.keras.utils.to_categorical(index,action_space)
+        
+        return encoded, selected_water
+        
+    def pi_b(state, o_old, water_locations, tol, selected_water):
+        
+        water_clusters= [[None]*1 for _ in range(4)]
+        
+        water_clusters[0] = water_locations[0:7,:]
+        water_clusters[1] = water_locations[7:14,:]
+        water_clusters[2] = water_locations[14:21,:]
+        water_clusters[3] = water_locations[21:,:]
+        
+        if np.abs(np.sum(water_clusters[o_old][selected_water,:]-state))>tol:
+            b=0
+            encoded = tf.keras.utils.to_categorical(b,2)
+        else:
+            encoded = np.array([0.7, 0.3])
+        
+        return encoded
+        
     
     
