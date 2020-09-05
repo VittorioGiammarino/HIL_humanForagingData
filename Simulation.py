@@ -17,6 +17,12 @@ class env:
         obs = np.array([0, 0])
         return obs
     
+    def reset_random():
+        x = np.random.uniform(-12000,12000)
+        y = np.random.uniform(-12000,12000)
+        obs = np.array([x,y])
+        return obs
+    
     def step(action,time,speed,k,state):
         obs_x = state[0,0] + (time[k]-time[k-1])*speed[k]*np.cos(action)
         obs_y = state[0,1] + (time[k]-time[k-1])*speed[k]*np.sin(action)
@@ -313,7 +319,7 @@ def HardCoded_policy(zeta, mu, max_epoch, nTraj, option_space, action_space, siz
     flag = np.empty((0,0),int)
     
     for episode in range(nTraj):
-        obs = env.reset()
+        obs = env.reset_random()
         x = np.empty((0,size_input),int)
         x = np.append(x, obs.reshape((1,size_input)), axis=0)
         u_tot = np.empty((0,0))

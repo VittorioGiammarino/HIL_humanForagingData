@@ -785,7 +785,7 @@ def BaumWelch(EV, lambdas, eta):
         print('Expectation done')
         print('Starting maximization step')
         optimizer = keras.optimizers.Adamax(learning_rate=1e-3)
-        epochs = 50 #number of iterations for the maximization step
+        epochs = 10 #number of iterations for the maximization step
             
         gamma_tilde_reshaped = GammaTildeReshape(gamma_tilde, EV.option_space)
         gamma_actions_false, gamma_actions_true = GammaReshapeActions(T, EV.option_space, EV.action_space, gamma, labels_reshaped)
@@ -1241,6 +1241,10 @@ class HardCoded_policy:
         if actions[index] == 360:
             index = 0
         encoded = tf.keras.utils.to_categorical(index,action_space)
+        noise = np.abs(np.random.normal(0,0.2,(1,action_space)))
+        
+        encoded = encoded + noise
+        encoded = encoded/np.sum(encoded)
         
         return encoded, selected_water
         
