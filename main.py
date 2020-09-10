@@ -194,14 +194,14 @@ nTrajs = 100
 max_epochHC = int(samples)
 
 [trajHC, controlHC, OptionHC, 
- TerminationHC] = sim.HardCoded_policy(zeta, muHC, max_epoch, nTrajs, option_spaceHC, action_space, size_input, Labels_dict_rad, speed, time, tol, water_locations)
+ TerminationHC] = sim.HardCoded_policy(zeta, muHC, max_epochHC, nTrajs, option_spaceHC, action_space, size_input, Labels_dict_rad, speedHC, timeHC, tol, water_locations)
 
 # %% plot some trajectories
 
-sample_traj = 50
+sample_traj = 5
 
 fig = plt.figure()                                                    
-plot_action = plt.scatter(trajHC[sample_traj][:,0], trajHC[sample_traj][:,1], c=time, marker='o', cmap='cool');
+plot_action = plt.scatter(trajHC[sample_traj][:,0], trajHC[sample_traj][:,1], c=timeHC, marker='o', cmap='cool');
 cbar = fig.colorbar(plot_action, ticks=[10, 50, 130])
 cbar.ax.set_yticklabels(['10sec', '50sec', '130sec'])
 plot_water = plt.plot(water_locations[:,0], water_locations[:,1], 'bx')
@@ -258,7 +258,7 @@ NN_options = hil.NN_options(option_space, size_input)
 NN_actions = hil.NN_actions(action_space, size_input)
 NN_termination = hil.NN_termination(termination_space, size_input)
 
-N=5 #Iterations
+N=4 #Iterations
 zeta = 0.001 #Failure factor
 
 gain_lambdas = np.logspace(0, 1.5, 4, dtype = 'float32')

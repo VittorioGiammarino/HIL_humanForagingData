@@ -1241,7 +1241,7 @@ class HardCoded_policy:
         if actions[index] == 360:
             index = 0
         encoded = tf.keras.utils.to_categorical(index,action_space)
-        noise = np.abs(np.random.normal(0,0.2,(1,action_space)))
+        noise = np.abs(np.random.normal(0,0.3,(1,action_space)))
         
         encoded = encoded + noise
         encoded = encoded/np.sum(encoded)
