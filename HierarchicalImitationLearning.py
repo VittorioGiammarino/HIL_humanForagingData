@@ -1143,15 +1143,15 @@ class Triple:
         self.actions_weights = NN_actions.get_weights()
         self.termination_weights = NN_termination.get_weights()
         
-    def save(self, lambdas, eta):
-        self.NN_options.save('Triple_models/H_model_lambda_{}_eta_{}/NN_options'.format(lambdas,eta))
-        self.NN_actions.save('Triple_models/H_model_lambda_{}_eta_{}/NN_actions'.format(lambdas,eta))
-        self.NN_termination.save('Triple_models/H_model_lambda_{}_eta_{}/NN_termination'.format(lambdas,eta))
+    def save(self, lambdas, eta, added_info):
+        self.NN_options.save('Triple_models/H_model_lambda_{}_eta_{}_{}/NN_options'.format(lambdas,eta,added_info))
+        self.NN_actions.save('Triple_models/H_model_lambda_{}_eta_{}_{}/NN_actions'.format(lambdas,eta,added_info))
+        self.NN_termination.save('Triple_models/H_model_lambda_{}_eta_{}_{}/NN_termination'.format(lambdas,eta,added_info))
         
-    def load(lambdas, eta):
-        NN_options = keras.models.load_model('Triple_models/H_model_lambda_{}_eta_{}/NN_options'.format(lambdas,eta))
-        NN_actions = keras.models.load_model('Triple_models/H_model_lambda_{}_eta_{}/NN_actions'.format(lambdas,eta))
-        NN_termination = keras.models.load_model('Triple_models/H_model_lambda_{}_eta_{}/NN_termination'.format(lambdas,eta))
+    def load(lambdas, eta, added_info):
+        NN_options = keras.models.load_model('Triple_models/H_model_lambda_{}_eta_{}_{}/NN_options'.format(lambdas,eta,added_info))
+        NN_actions = keras.models.load_model('Triple_models/H_model_lambda_{}_eta_{}_{}/NN_actions'.format(lambdas,eta,added_info))
+        NN_termination = keras.models.load_model('Triple_models/H_model_lambda_{}_eta_{}_{}/NN_termination'.format(lambdas,eta,added_info))
         
         return NN_options, NN_actions, NN_termination
         

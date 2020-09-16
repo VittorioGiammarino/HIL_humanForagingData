@@ -280,6 +280,12 @@ eta = tf.Variable(initial_value=100., trainable=False)
 # %% Learning HC policy
 NN_Termination, NN_Actions, NN_Options = hil.BaumWelch(HC_ED, lambdas, eta)
   
+#%% Save learnt hard Coded policy
+
+Triple_learntHC = hil.Triple(NN_Options, NN_Actions, NN_Termination)
+Triple_learntHC.save(lambdas.numpy()[0], eta.numpy(), 'Hard_coded_policy')
+
+
 #%% Simulate policy learnt
 
 Trained_triple = hil.Triple(NN_Options, NN_Actions, NN_Termination)

@@ -14,7 +14,8 @@ import HierarchicalImitationLearning as hil
 class env:
     
     def reset():
-        obs = np.array([0, 0])
+        #obs = np.array([0, 0])
+        obs = np.array([6.72584, -8.25106])
         return obs
     
     def reset_random():
