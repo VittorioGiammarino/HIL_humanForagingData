@@ -38,8 +38,8 @@ class NN_PI_LO:
                 
     def NN_model(self):
         model = keras.Sequential([
-                keras.layers.Dense(30, activation='relu', input_shape=(self.size_input,),
-                                   kernel_initializer=keras.initializers.RandomUniform(minval=0, maxval=1, seed=None),
+                keras.layers.Dense(100, activation='relu', input_shape=(self.size_input,),
+                                   kernel_initializer=keras.initializers.RandomUniform(minval=-0.05, maxval=0.05, seed=None),
                                    bias_initializer=keras.initializers.Zeros()),
                 keras.layers.Dense(self.action_space),
                 keras.layers.Softmax()
@@ -52,6 +52,13 @@ class NN_PI_LO:
                                   show_layer_names=True,
                                   expand_nested=True)
         
+    def save(model, name):
+        model.save(name)
+        
+    def load(name):
+        NN_model = keras.models.load_model(name)
+        return NN_model
+        
             
 class NN_PI_B:
 # =============================================================================
@@ -63,19 +70,25 @@ class NN_PI_B:
                 
     def NN_model(self):
         model = keras.Sequential([
-                keras.layers.Dense(30, activation='relu', input_shape=(self.size_input,),
-                                   kernel_initializer=keras.initializers.RandomUniform(minval=0, maxval=1, seed=None),
+                keras.layers.Dense(100, activation='relu', input_shape=(self.size_input,),
+                                   kernel_initializer=keras.initializers.RandomUniform(minval=-0.05, maxval=0.05, seed=None),
                                    bias_initializer=keras.initializers.Zeros()),
                 keras.layers.Dense(self.termination_space),
                 keras.layers.Softmax()
                                  ])               
         return model
-    
+        
     def NN_model_plot(self,model):
         tf.keras.utils.plot_model(model, to_file='Figures/FiguresBatch/NN_pi_b.png', 
                                   show_shapes=True, 
                                   show_layer_names=True,
                                   expand_nested=True)
+    def save(model, name):
+        model.save(name)
+        
+    def load(name):
+        NN_model = keras.models.load_model(name)
+        return NN_model
             
 class NN_PI_HI:
 # =============================================================================
@@ -100,6 +113,13 @@ class NN_PI_HI:
                                   show_shapes=True, 
                                   show_layer_names=True,
                                   expand_nested=True)     
+        
+    def save(model, name):
+        model.save(name)
+        
+    def load(name):
+        NN_model = keras.models.load_model(name)
+        return NN_model
     
 
 class BatchHIL:
