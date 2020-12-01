@@ -30,19 +30,19 @@ for folder in Folders:
         Rotation.append(Labels)
 
 # %% Plot a random trajectory and reward Distribution
-sigma1 = 5
-circle1 = plt.Circle((60, 75), 2*sigma1, color='k',  fill=False)
-sigma2 = 11
-circle2 = plt.Circle((-15, -50), 2*sigma2, color='k',  fill=False)
-sigma3 = 18
-circle3 = plt.Circle((-50, 30), 2*sigma3, color='k',  fill=False)
-sigma4 = 13
-circle4 = plt.Circle((49, -40), 2*sigma4, color='k',  fill=False)
+sigma1 = 0.5
+circle1 = plt.Circle((6, 7.5), 2*sigma1, color='k',  fill=False)
+sigma2 = 1.1
+circle2 = plt.Circle((-1.5, -5), 2*sigma2, color='k',  fill=False)
+sigma3 = 1.8
+circle3 = plt.Circle((-5, 3), 2*sigma3, color='k',  fill=False)
+sigma4 = 1.3
+circle4 = plt.Circle((4.9, -4), 2*sigma4, color='k',  fill=False)
   
-Rand_traj = np.random.randint(0,len(Time))
+Rand_traj = 0 #np.random.randint(0,len(Time))
 
 fig, ax = plt.subplots()
-plot_data = plt.scatter(Trajectories[Rand_traj][:,0], Trajectories[Rand_traj][:,1], c=Time[Rand_traj], marker='o', cmap='cool')
+plot_data = plt.scatter(0.1*Trajectories[Rand_traj][0:2000,0], 0.1*Trajectories[Rand_traj][0:2000:,1], c=Time[Rand_traj][0:2000], marker='o', cmap='cool')
 cbar = fig.colorbar(plot_data, ticks=[10, 100, 200, 300, 400, 500])
 cbar.ax.set_yticklabels(['time = 0', 'time = 100', 'time = 200', 'time = 300', 'time = 400', 'time = 500'])
 ax.add_artist(circle1)
@@ -51,6 +51,7 @@ ax.add_artist(circle3)
 ax.add_artist(circle4)
 plt.xlabel('x')
 plt.ylabel('y')
+plt.savefig('Figures/FiguresExpert/Expert_Traj_VS_Time_traj{}.eps'.format(Rand_traj), format='eps')
 plt.show()  
 
 # %% Training
