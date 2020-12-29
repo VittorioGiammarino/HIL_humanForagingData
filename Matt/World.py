@@ -9,7 +9,7 @@ Created on Tue Nov 24 17:13:05 2020
 import numpy as np
 import csv
 
-class Foraging:
+class Foraging:        
     def TransitionCheck4Labels(state,state_next):
         Transition = np.zeros((8,2))
         Transition[0,0] = state[0] + 1
@@ -65,8 +65,67 @@ class Foraging:
             
         return sim
     
+    def GeneratePsi(Simulated_states, coin_location):      
+        reward = 0
+        see_coin_array = np.empty((0))
+        for i in range(len(Simulated_states)):
+            see_coin = 0
+            dist_from_coins = np.linalg.norm(coin_location-Simulated_states[i,:],2,1)
+            l=0
+            for k in range(len(dist_from_coins)):
+                if dist_from_coins[k]<=8:
+                    see_coin = 1
+                if dist_from_coins[k]<=3:
+                    coin_location = np.delete(coin_location, l, 0)
+                    reward = reward+1
+                else:
+                    l=l+1
+                    
+            see_coin_array = np.append(see_coin_array, see_coin)
+                       
+        return see_coin_array, reward
+    
+    def CoinLocation(Folder, experiment):
+        N_coins = 325
+        with open("4_walls_coins_task/FONC_{}_DeID/fMRI/runNumber{}_coin_location.txt".format(Folder,experiment)) as f:
+            coin_location_raw = f.readlines()
+            
+        if len(coin_location_raw) > N_coins:
+            start_counting = len(coin_location_raw) - N_coins
+            coin_location_raw = coin_location_raw[start_counting:]
+
+        for i in range(len(coin_location_raw)):
+            row = coin_location_raw[i][7:-2]
+            row = row.replace('[', ',')
+            coin_location_raw[i] = row
+            
+        coin_location_data = csv.reader(coin_location_raw)
+        coin_location = np.empty((0,2))
+        for row in coin_location_data:
+            if len(row)==3:
+                coin_location = np.append(coin_location, np.array([[np.round(float(row[0])), np.round(float(row[2]))]]),0)
+            else:
+                coin_location = np.append(coin_location, np.array([[np.round(float(row[1])), np.round(float(row[3]))]]),0) 
+                
+        bool_distribution = np.empty((4))
+        j=0
+        for i in range(len(coin_location)):
+            bool_distribution[0] = (coin_location[j,0]-60)**2 + (coin_location[j,1]-75)**2 <= (2*5)**2
+            bool_distribution[1] = (coin_location[j,0]+15)**2 + (coin_location[j,1]+50)**2 <= (2*11)**2
+            bool_distribution[2] = (coin_location[j,0]+50)**2 + (coin_location[j,1]-30)**2 <= (2*18)**2
+            bool_distribution[3] = (coin_location[j,0]-49)**2 + (coin_location[j,1]+40)**2 <= (2*13)**2
+            
+            if np.sum(bool_distribution)==0:
+               coin_location = np.delete(coin_location, j, 0) 
+            else:
+               j = j+1                
+                
+        return coin_location
+    
     
     def ProcessData(Folder, experiment):
+        coin_location = Foraging.CoinLocation(Folder, experiment)
+        
         with open("4_walls_coins_task/FONC_{}_DeID/fMRI/runNumber{}_position.txt".format(Folder,experiment)) as f:
             data_raw = f.readlines()
     
@@ -91,11 +150,13 @@ class Foraging:
         for i in range(len(Training_set_cleaned)-1):
             index = Foraging.TransitionCheck4Labels(Training_set_cleaned[i,:], Training_set_cleaned[i+1,:])
             Labels = np.append(Labels, index)
-
+            
         # % Simulate dynamics
         Simulated_states = Foraging.StateTransition(Labels, Training_set_cleaned)
-        
-        return Simulated_states, Labels, time_cleaned
+        see_coin_array, reward = Foraging.GeneratePsi(Simulated_states, coin_location)
+            
+        return Simulated_states, Labels, time_cleaned, see_coin_array, reward
+    
     
 class Simulation_NN:
     def __init__(self, pi_hi, pi_lo, pi_b):
@@ -135,6 +196,10 @@ class Simulation_NN:
         control = [[None]*1 for _ in range(number_of_trajectories)]
         Option = [[None]*1 for _ in range(number_of_trajectories)]
         Termination = [[None]*1 for _ in range(number_of_trajectories)]
+        reward = np.empty((0,0),int)
+        psi_evolution = [[None]*1 for _ in range(number_of_trajectories)]
+        
+        coin_location = 0.1*Foraging.CoinLocation(6, 1)
     
         for t in range(0,number_of_trajectories):       
             x = np.empty((0,2))
@@ -142,6 +207,10 @@ class Simulation_NN:
             u_tot = np.empty((0,0))
             o_tot = np.empty((0,0),int)
             b_tot = np.empty((0,0),int)
+            psi_tot = np.empty((0,0),int)
+            psi = 0
+            psi_tot = np.append(psi_tot, psi)
+            r=0
         
             # Initial Option
             prob_o = self.mu
@@ -153,8 +222,8 @@ class Simulation_NN:
             o_tot = np.append(o_tot,o)
         
             # Termination
-            state = x[0,:]
-            state = state.reshape(1,2)
+            state_partial = x[0,:].reshape(1,2)
+            state = np.concatenate((state_partial,[[psi]]),1)
             prob_b = self.pi_b[o](state).numpy()
             prob_b_rescaled = np.divide(prob_b,np.amin(prob_b)+0.01)
             for i in range(1,prob_b_rescaled.shape[1]):
@@ -183,8 +252,8 @@ class Simulation_NN:
             o_tot = np.append(o_tot,o)
         
             for k in range(0,max_epoch_per_traj):
-                state = x[k,:]
-                state = state.reshape((1,2))
+                state_partial = x[k,:].reshape((1,2))
+                state = np.concatenate((state_partial,[[psi]]),1)
                 # draw action
                 prob_u = self.pi_lo[o](state).numpy()
                 prob_u_rescaled = np.divide(prob_u,np.amin(prob_u)+0.01)
@@ -194,13 +263,30 @@ class Simulation_NN:
                 u = np.amin(np.where(draw_u<prob_u_rescaled)[1])
             
                 # given action, draw next state
-                state_plus1 = Simulation_NN.Transition(state, u)
+                state_plus1 = Simulation_NN.Transition(state_partial, u)
                 state_plus1 = state_plus1.reshape(1,2)
                 x = np.append(x, state_plus1, 0)
                 u_tot = np.append(u_tot,u)
+                
+                # Update psi and reward
+                dist_from_coins = np.linalg.norm(coin_location-state_plus1,2,1)
+                l=0
+                psi = 0
+                for p in range(len(dist_from_coins)):
+                    if dist_from_coins[p]<=0.8:
+                        psi = 1
+                    if dist_from_coins[p]<=0.3:
+                        coin_location = np.delete(coin_location, l, 0)
+                        r = r+1
+                    else:
+                        l=l+1
+                    
+                psi_tot = np.append(psi_tot, psi)              
                         
                 # Select Termination
                 # Termination
+                state_plus1_partial = x[k+1,:].reshape((1,2))
+                state_plus1 = np.concatenate((state_plus1_partial,[[psi]]),1)
                 prob_b = self.pi_b[o](state_plus1).numpy()
                 prob_b_rescaled = np.divide(prob_b,np.amin(prob_b)+0.01)
                 for i in range(1,prob_b_rescaled.shape[1]):
@@ -233,6 +319,8 @@ class Simulation_NN:
             control[t]=u_tot
             Option[t]=o_tot
             Termination[t]=b_tot
+            psi_evolution[t] = psi_tot                
+            reward = np.append(reward,r)
 
-            return traj, control, Option, Termination
+            return traj, control, Option, Termination, psi_evolution, reward
             

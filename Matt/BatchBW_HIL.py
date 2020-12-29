@@ -7,6 +7,7 @@ Created on Thu Oct 22 16:58:25 2020
 """
 
 import numpy as np
+import World
 import tensorflow as tf 
 from tensorflow import keras
 import tensorflow.keras.backend as kb
@@ -38,8 +39,8 @@ class NN_PI_LO:
                 
     def NN_model(self):
         model = keras.Sequential([
-                keras.layers.Dense(100, activation='relu', input_shape=(self.size_input,),
-                                   kernel_initializer=keras.initializers.RandomUniform(minval=-0.05, maxval=0.05, seed=None),
+                keras.layers.Dense(30, activation='relu', input_shape=(self.size_input,),
+                                   kernel_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5, seed=None),
                                    bias_initializer=keras.initializers.Zeros()),
                 keras.layers.Dense(self.action_space),
                 keras.layers.Softmax()
@@ -51,7 +52,6 @@ class NN_PI_LO:
                                   show_shapes=True, 
                                   show_layer_names=True,
                                   expand_nested=True)
-        
     def save(model, name):
         model.save(name)
         
@@ -70,14 +70,14 @@ class NN_PI_B:
                 
     def NN_model(self):
         model = keras.Sequential([
-                keras.layers.Dense(100, activation='relu', input_shape=(self.size_input,),
-                                   kernel_initializer=keras.initializers.RandomUniform(minval=-0.05, maxval=0.05, seed=None),
+                keras.layers.Dense(30, activation='relu', input_shape=(self.size_input,),
+                                   kernel_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5, seed=None),
                                    bias_initializer=keras.initializers.Zeros()),
                 keras.layers.Dense(self.termination_space),
                 keras.layers.Softmax()
                                  ])               
         return model
-        
+    
     def NN_model_plot(self,model):
         tf.keras.utils.plot_model(model, to_file='Figures/FiguresBatch/NN_pi_b.png', 
                                   show_shapes=True, 
@@ -88,7 +88,7 @@ class NN_PI_B:
         
     def load(name):
         NN_model = keras.models.load_model(name)
-        return NN_model
+        return NN_model        
             
 class NN_PI_HI:
 # =============================================================================
@@ -101,7 +101,7 @@ class NN_PI_HI:
     def NN_model(self):
         model = keras.Sequential([
                 keras.layers.Dense(100, activation='relu', input_shape=(self.size_input,),
-                                   kernel_initializer=keras.initializers.RandomUniform(minval=-0.05, maxval=0.05, seed=None),
+                                   kernel_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5, seed=None),
                                    bias_initializer=keras.initializers.Zeros()),
                 keras.layers.Dense(self.option_space),
                 keras.layers.Softmax()
@@ -113,7 +113,6 @@ class NN_PI_HI:
                                   show_shapes=True, 
                                   show_layer_names=True,
                                   expand_nested=True)     
-        
     def save(model, name):
         model.save(name)
         
@@ -146,6 +145,9 @@ class BatchHIL:
         self.epochs = M_step_epoch
         self.size_batch = size_batch
         self.optimizer = optimizer
+        self.Lambda_Lb = 1
+        self.Lambda_Lv = 0.1
+        self.Lambda_DKL = 0.01
         
     def Pi_hi(ot, Pi_hi_parameterization, state):
         Pi_hi = Pi_hi_parameterization(state)
@@ -381,8 +383,31 @@ class BatchHIL:
         
         return gamma_reshaped_options
     
-    def Loss(gamma_tilde_reshaped, gamma_reshaped_options, gamma_actions, 
-                    NN_termination, NN_options, NN_actions, T, TrainingSet):
+    def Regularizer_Lb(pi_hi):
+        tau = 0.5
+        Lb = kb.sum(kb.sqrt(kb.square(kb.sum(pi_hi,0)/pi_hi.shape[0] - tau)))
+        return Lb
+    
+    def Regularizer_Lv(pi_hi):
+        Lv = kb.sum(kb.sum(pi_hi-kb.sum(pi_hi,0)/pi_hi.shape[0],0)/pi_hi.shape[0])
+        return Lv
+    
+    def Regularizer_KL_divergence(NN_actions, TrainingSet, gamma_actions, auxiliary_vector):
+        option_space = len(NN_actions)
+        DKL = 0
+        epsilon = 0.000001
+        T = len(TrainingSet)                
+        for i in range(option_space):
+            for j in range(option_space):
+                if i!=j:
+                    pi_lo_o_i = kb.sum(auxiliary_vector*NN_actions[i](TrainingSet,training=True),1)
+                    pi_lo_o_j = kb.sum(auxiliary_vector*NN_actions[j](TrainingSet,training=True),1)
+                    DKL = DKL + kb.sum(pi_lo_o_i*kb.log(pi_lo_o_i/(pi_lo_o_j+epsilon)),0)/T
+                    
+        return DKL
+    
+    def Loss(gamma_tilde_reshaped, gamma_reshaped_options, gamma_actions, auxiliary_vector,
+                    NN_termination, NN_options, NN_actions, T, TrainingSet, Lambda_Lb, Lambda_Lv, Lambda_DKL):
 # =============================================================================
 #         Compute batch loss function to minimize
 # =============================================================================
@@ -397,6 +422,10 @@ class BatchHIL:
         pi_hi = NN_options(TrainingSet,training=True)
         loss_options = -kb.sum(gamma_reshaped_options*kb.log(pi_hi))/(T)
         loss = loss + loss_options
+        Lb = BatchHIL.Regularizer_Lb(pi_hi)
+        Lv = BatchHIL.Regularizer_Lv(pi_hi)
+        DKL = BatchHIL.Regularizer_KL_divergence(NN_actions, TrainingSet, gamma_actions, auxiliary_vector)
+        loss = loss + Lambda_Lb*Lb - Lambda_Lv*Lv - Lambda_DKL*DKL
     
         return loss    
 
@@ -420,7 +449,7 @@ class BatchHIL:
                 weights.append(self.NN_options.trainable_weights)
                 tape.watch(weights)
                 loss = BatchHIL.Loss(gamma_tilde_reshaped, gamma_reshaped_options, gamma_actions, 
-                                     self.NN_termination, self.NN_options, self.NN_actions, T, self.TrainingSet)
+                                     self.NN_termination, self.NN_options, self.NN_actions, T, self.TrainingSet, self.Lambda_Lb, self.Lambda_Lv, self.Lambda_DKL)
             
             grads = tape.gradient(loss,weights)
             j=0
@@ -434,7 +463,7 @@ class BatchHIL:
         return loss        
     
 
-    def OptimizeLossBatch(self, gamma_tilde_reshaped, gamma_reshaped_options, gamma_actions):
+    def OptimizeLossBatch(self, gamma_tilde_reshaped, gamma_reshaped_options, gamma_actions, auxiliary_vector):
 # =============================================================================
 #         optimize loss in mini-batches
 # =============================================================================
@@ -458,8 +487,9 @@ class BatchHIL:
                     loss = BatchHIL.Loss(gamma_tilde_reshaped[n*self.size_batch:(n+1)*self.size_batch,:,:], 
                                          gamma_reshaped_options[n*self.size_batch:(n+1)*self.size_batch,:], 
                                          gamma_actions[n*self.size_batch:(n+1)*self.size_batch,:,:], 
+                                         auxiliary_vector[n*self.size_batch:(n+1)*self.size_batch,:],
                                          self.NN_termination, self.NN_options, self.NN_actions, self.size_batch, 
-                                         self.TrainingSet[n*self.size_batch:(n+1)*self.size_batch,:])
+                                         self.TrainingSet[n*self.size_batch:(n+1)*self.size_batch,:], self.Lambda_Lb, self.Lambda_Lv, self.Lambda_DKL)
             
                 grads = tape.gradient(loss,weights)
                 j=0
@@ -470,7 +500,28 @@ class BatchHIL:
                 self.optimizer.apply_gradients(zip(grads[-1][:], self.NN_options.trainable_weights))
                 print('loss:', float(loss))
         
-        return loss      
+        return loss   
+    
+    def likelihood_approximation(self):
+        T = self.TrainingSet.shape[0]
+        for t in range(T):
+            state = self.TrainingSet[t,:].reshape(1,len(self.TrainingSet[t,:]))
+            action = self.Labels[t]    
+            partial = 0
+            for o_past in range(self.option_space):
+                for b in range(self.termination_space):
+                    for o in range(self.option_space):
+                        partial = partial + BatchHIL.Pi_hi(o_past, self.NN_options, state)*BatchHIL.Pi_combined(o, o_past, action, b, self.NN_options, self.NN_actions[o], 
+                                                                                                                self.NN_termination[o_past], state, self.zeta, self.option_space)
+            if t == 0:
+                likelihood = partial
+            else:
+                likelihood = likelihood+partial
+
+
+        likelihood = (likelihood/T).numpy()
+        
+        return likelihood
             
     def Baum_Welch(self,N):
 # =============================================================================
@@ -478,6 +529,7 @@ class BatchHIL:
 # =============================================================================
         
         T = self.TrainingSet.shape[0]
+        likelihood = np.empty((0))
             
         for n in range(N):
             print('iter Loss', n+1, '/', N)
@@ -493,14 +545,21 @@ class BatchHIL:
             gamma_tilde_reshaped = BatchHIL.GammaTildeReshape(gamma_tilde, self.option_space)
             gamma_actions = BatchHIL.GammaReshapeActions(T, self.option_space, self.action_space, gamma, self.Labels)
             gamma_reshaped_options = BatchHIL.GammaReshapeOptions(gamma)
+            m,n,o = gamma_actions.shape
+            auxiliary_vector = np.zeros((m,n))
+            for l in range(m):
+                for k in range(n):
+                    if gamma_actions[l,k,0]!=0:
+                        auxiliary_vector[l,k] = 1
     
 
-            loss = BatchHIL.OptimizeLossBatch(self, gamma_tilde_reshaped, gamma_reshaped_options, gamma_actions)
+            loss = BatchHIL.OptimizeLossBatch(self, gamma_tilde_reshaped, gamma_reshaped_options, gamma_actions, auxiliary_vector)
+            likelihood = np.append(likelihood, BatchHIL.likelihood_approximation(self))
 
         print('Maximization done, Total Loss:',float(loss))#float(loss_options+loss_action+loss_termination))
 
         
-        return self.NN_options, self.NN_actions, self.NN_termination   
+        return self.NN_options, self.NN_actions, self.NN_termination, likelihood
 
             
         
