@@ -39,7 +39,7 @@ class NN_PI_LO:
                 
     def NN_model(self):
         model = keras.Sequential([
-                keras.layers.Dense(30, activation='relu', input_shape=(self.size_input,),
+                keras.layers.Dense(100, activation='relu', input_shape=(self.size_input,),
                                    kernel_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5, seed=None),
                                    bias_initializer=keras.initializers.Zeros()),
                 keras.layers.Dense(self.action_space),
@@ -70,7 +70,7 @@ class NN_PI_B:
                 
     def NN_model(self):
         model = keras.Sequential([
-                keras.layers.Dense(30, activation='relu', input_shape=(self.size_input,),
+                keras.layers.Dense(100, activation='relu', input_shape=(self.size_input,),
                                    kernel_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5, seed=None),
                                    bias_initializer=keras.initializers.Zeros()),
                 keras.layers.Dense(self.termination_space),
@@ -100,7 +100,7 @@ class NN_PI_HI:
                 
     def NN_model(self):
         model = keras.Sequential([
-                keras.layers.Dense(100, activation='relu', input_shape=(self.size_input,),
+                keras.layers.Dense(200, activation='relu', input_shape=(self.size_input,),
                                    kernel_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5, seed=None),
                                    bias_initializer=keras.initializers.Zeros()),
                 keras.layers.Dense(self.option_space),
@@ -385,7 +385,8 @@ class BatchHIL:
     
     def Regularizer_Lb(pi_hi):
         tau = 0.5
-        Lb = kb.sum(kb.sqrt(kb.square(kb.sum(pi_hi,0)/pi_hi.shape[0] - tau)))
+        epsilon = 0.000001
+        Lb = kb.sum(kb.sqrt(kb.square(kb.sum(pi_hi,0)/pi_hi.shape[0] - tau)+epsilon))
         return Lb
     
     def Regularizer_Lv(pi_hi):
@@ -402,7 +403,7 @@ class BatchHIL:
                 if i!=j:
                     pi_lo_o_i = kb.sum(auxiliary_vector*NN_actions[i](TrainingSet,training=True),1)
                     pi_lo_o_j = kb.sum(auxiliary_vector*NN_actions[j](TrainingSet,training=True),1)
-                    DKL = DKL + kb.sum(pi_lo_o_i*kb.log(pi_lo_o_i/(pi_lo_o_j+epsilon)),0)/T
+                    DKL = DKL + kb.sum(pi_lo_o_i*kb.log(kb.clip(pi_lo_o_i/(pi_lo_o_j+epsilon),1e-10,1.0)),0)/T
                     
         return DKL
     
@@ -415,19 +416,19 @@ class BatchHIL:
         option_space = len(NN_actions)
         for i in range(option_space):
             pi_b = NN_termination[i](TrainingSet[:],training=True)
-            loss = loss -kb.sum(gamma_tilde_reshaped[:,:,i]*kb.log(pi_b[:]))/(T)
+            loss = loss -kb.sum(gamma_tilde_reshaped[:,:,i]*kb.log(kb.clip(pi_b[:],1e-10,1.0)))/(T)
             pi_lo = NN_actions[i](TrainingSet,training=True)
-            loss = loss -(kb.sum(gamma_actions[:,:,i]*kb.log(pi_lo)))/(T)
+            loss = loss -(kb.sum(gamma_actions[:,:,i]*kb.log(kb.clip(pi_lo,1e-10,1.0))))/(T)
             
         pi_hi = NN_options(TrainingSet,training=True)
-        loss_options = -kb.sum(gamma_reshaped_options*kb.log(pi_hi))/(T)
+        loss_options = -kb.sum(gamma_reshaped_options*kb.log(kb.clip(pi_hi,1e-10,1.0)))/(T)
         loss = loss + loss_options
         Lb = BatchHIL.Regularizer_Lb(pi_hi)
         Lv = BatchHIL.Regularizer_Lv(pi_hi)
         DKL = BatchHIL.Regularizer_KL_divergence(NN_actions, TrainingSet, gamma_actions, auxiliary_vector)
         loss = loss + Lambda_Lb*Lb - Lambda_Lv*Lv - Lambda_DKL*DKL
     
-        return loss    
+        return loss 
 
     
     def OptimizeLoss(self, gamma_tilde_reshaped, gamma_reshaped_options, gamma_actions):

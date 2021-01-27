@@ -33,6 +33,7 @@ for folder in Folders:
         Rotation.append(Labels)
         Reward.append(reward_single_traj)
 
+
 # %% Plot a random trajectory and reward Distribution
 
 coins_location = World.Foraging.CoinLocation(6, 1)
@@ -86,22 +87,24 @@ plt.savefig('Figures/FiguresExpert/Expert_Traj_VS_View_traj{}.eps'.format(Rand_t
 plt.show()  
 
 # %% Training
+Likelihood_batch_list = []
 option_space = 2
-M_step_epoch = 50
+M_step_epoch = 100
 size_batch = 32
-optimizer = keras.optimizers.Adamax(learning_rate=1e-3)
-Agent_BatchHIL = BatchBW_HIL.BatchHIL(TrainingSet[:,:], Labels[:,:], option_space, M_step_epoch, size_batch, optimizer)
+optimizer = keras.optimizers.Adamax(learning_rate=1e-1)
+Agent_BatchHIL = BatchBW_HIL.BatchHIL(TrainingSet[0:5000,:], Labels[0:5000,:], option_space, M_step_epoch, size_batch, optimizer)
 N=20 #number of iterations for the BW algorithm
 start_batch_time = time.time()
 pi_hi_batch, pi_lo_batch, pi_b_batch, likelihood = Agent_BatchHIL.Baum_Welch(N)
 end_batch_time = time.time()
 Batch_time = end_batch_time-start_batch_time
+Likelihood_batch_list.append(likelihood)
 
 # %%evaluation
 
 for traj in range(10):
     BatchSim = World.Simulation_NN(pi_hi_batch, pi_lo_batch, pi_b_batch)
-    [trajBatch, controlBatch, OptionsBatch, TerminationBatch, psiBatch, rewardBatch] = BatchSim.HierarchicalStochasticSampleTrajMDP(3000,1,np.array([0, 0]))
+    [trajBatch, controlBatch, OptionsBatch, TerminationBatch, psiBatch, rewardBatch] = BatchSim.HierarchicalStochasticSampleTrajMDP(3000,1,TrainingSet[0,1:3].reshape(2,))
 
     # Plot result
 
