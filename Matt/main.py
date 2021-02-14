@@ -38,7 +38,7 @@ for folder in Folders:
 
 coins_location = World.Foraging.CoinLocation(6, 1)
 
-Rand_traj = 4 #np.random.randint(0,len(Time))
+Rand_traj = 2 #np.random.randint(0,len(Time))
 
 sigma1 = 0.5
 circle1 = ptch.Circle((6, 7.5), 2*sigma1, color='k',  fill=False)
@@ -54,7 +54,7 @@ ax.add_artist(circle1)
 ax.add_artist(circle2)
 ax.add_artist(circle3)
 ax.add_artist(circle4)
-plot_data = plt.scatter(Trajectories[Rand_traj][:,0], Trajectories[Rand_traj][:,1], c=Time[Rand_traj][:-1], marker='o', cmap='cool')
+plot_data = plt.scatter(Trajectories[Rand_traj][0:1000,0], Trajectories[Rand_traj][0:1000,1], c=Time[Rand_traj][0:1001-1], marker='o', cmap='cool')
 plt.plot(0.1*coins_location[:,0], 0.1*coins_location[:,1], 'xb')
 cbar = fig.colorbar(plot_data, ticks=[10, 100, 200, 300, 400, 500])
 cbar.ax.set_yticklabels(['time = 0', 'time = 100', 'time = 200', 'time = 300', 'time = 400', 'time = 500'])
@@ -88,11 +88,13 @@ plt.show()
 
 # %% Training
 Likelihood_batch_list = []
+T_set = Trajectories[Rand_traj][0:1000,:]
+Heading_set = Rotation[Rand_traj][0:1000]
 option_space = 2
 M_step_epoch = 100
 size_batch = 32
 optimizer = keras.optimizers.Adamax(learning_rate=1e-1)
-Agent_BatchHIL = BatchBW_HIL.BatchHIL(TrainingSet[0:5000,:], Labels[0:5000,:], option_space, M_step_epoch, size_batch, optimizer)
+Agent_BatchHIL = BatchBW_HIL.BatchHIL(T_set, Heading_set, option_space, M_step_epoch, size_batch, optimizer)
 N=20 #number of iterations for the BW algorithm
 start_batch_time = time.time()
 pi_hi_batch, pi_lo_batch, pi_b_batch, likelihood = Agent_BatchHIL.Baum_Welch(N)
@@ -100,11 +102,14 @@ end_batch_time = time.time()
 Batch_time = end_batch_time-start_batch_time
 Likelihood_batch_list.append(likelihood)
 
+# %%
+likelihood_temp = Agent_BatchHIL.likelihood_approximation()
+
 # %%evaluation
 
 for traj in range(10):
     BatchSim = World.Simulation_NN(pi_hi_batch, pi_lo_batch, pi_b_batch)
-    [trajBatch, controlBatch, OptionsBatch, TerminationBatch, psiBatch, rewardBatch] = BatchSim.HierarchicalStochasticSampleTrajMDP(3000,1,TrainingSet[0,1:3].reshape(2,))
+    [trajBatch, controlBatch, OptionsBatch, TerminationBatch, psiBatch, rewardBatch] = BatchSim.HierarchicalStochasticSampleTrajMDP(3000,1,np.array([0,0]))
 
     # Plot result
 

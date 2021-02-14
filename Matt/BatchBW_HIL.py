@@ -39,10 +39,10 @@ class NN_PI_LO:
                 
     def NN_model(self):
         model = keras.Sequential([
-                keras.layers.Dense(100, activation='relu', input_shape=(self.size_input,),
-                                   kernel_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5, seed=None),
+                keras.layers.Dense(30, activation='relu', input_shape=(self.size_input,),
+                                   kernel_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5, seed=0),
                                    bias_initializer=keras.initializers.Zeros()),
-                keras.layers.Dense(self.action_space),
+                keras.layers.Dense(self.action_space, kernel_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5, seed=1)),
                 keras.layers.Softmax()
                                  ])              
         return model
@@ -70,10 +70,10 @@ class NN_PI_B:
                 
     def NN_model(self):
         model = keras.Sequential([
-                keras.layers.Dense(100, activation='relu', input_shape=(self.size_input,),
-                                   kernel_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5, seed=None),
+                keras.layers.Dense(30, activation='relu', input_shape=(self.size_input,),
+                                   kernel_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5, seed=2),
                                    bias_initializer=keras.initializers.Zeros()),
-                keras.layers.Dense(self.termination_space),
+                keras.layers.Dense(self.termination_space, kernel_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5, seed=3)),
                 keras.layers.Softmax()
                                  ])               
         return model
@@ -100,10 +100,10 @@ class NN_PI_HI:
                 
     def NN_model(self):
         model = keras.Sequential([
-                keras.layers.Dense(200, activation='relu', input_shape=(self.size_input,),
-                                   kernel_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5, seed=None),
+                keras.layers.Dense(100, activation='relu', input_shape=(self.size_input,),
+                                   kernel_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5, seed=4),
                                    bias_initializer=keras.initializers.Zeros()),
-                keras.layers.Dense(self.option_space),
+                keras.layers.Dense(self.option_space, kernel_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5, seed=5)),
                 keras.layers.Softmax()
                                 ])                
         return model
