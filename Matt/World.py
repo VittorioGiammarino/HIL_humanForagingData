@@ -9,7 +9,47 @@ Created on Tue Nov 24 17:13:05 2020
 import numpy as np
 import csv
 
-class Foraging:        
+class Foraging:    
+
+    def TransitionCheck4Labels_simplified(state,state_next):
+        Transition = np.zeros((4,2))
+        Transition[0,0] = state[0] + 1
+        Transition[0,1] = state[1] + 0
+        Transition[1,0] = state[0] + 0
+        Transition[1,1] = state[1] + 1
+        Transition[2,0] = state[0] - 1
+        Transition[2,1] = state[1] + 0
+        Transition[3,0] = state[0] + 0
+        Transition[3,1] = state[1] - 1
+        index_x = np.where(state_next[0] == Transition[:,0])[0]
+        index_y = np.where(state_next[1] == Transition[:,1])[0]
+        index = np.intersect1d(index_y,index_x)
+        if index.size == 0:
+            index = 4
+        
+        return index
+    
+    def StateTransition_simplified(original_actions, original_data):
+        sim = np.empty((0,2))
+        init = original_data[0,:]
+        sim = np.append(sim, init.reshape(1,2), 0)
+        for i in range(len(original_actions)):
+            index = original_actions[i]
+            Transition = np.zeros((5,2))
+            Transition[0,0] = sim[i,0] + 1
+            Transition[0,1] = sim[i,1] + 0
+            Transition[1,0] = sim[i,0] + 0
+            Transition[1,1] = sim[i,1] + 1
+            Transition[2,0] = sim[i,0] - 1
+            Transition[2,1] = sim[i,1] + 0
+            Transition[3,0] = sim[i,0] + 0
+            Transition[3,1] = sim[i,1] - 1
+            Transition[4,:] = original_data[i,:]
+            next_state = Transition[int(index),:]
+            sim = np.append(sim,next_state.reshape(1,2),0)
+            
+        return sim    
+    
     def TransitionCheck4Labels(state,state_next):
         Transition = np.zeros((8,2))
         Transition[0,0] = state[0] + 1
@@ -85,7 +125,7 @@ class Foraging:
                        
         return see_coin_array, reward
     
-    def CoinLocation(Folder, experiment):
+    def CoinLocation(Folder, experiment, version = 'distr_only'):
         N_coins = 325
         with open("4_walls_coins_task/FONC_{}_DeID/fMRI/runNumber{}_coin_location.txt".format(Folder,experiment)) as f:
             coin_location_raw = f.readlines()
@@ -106,25 +146,26 @@ class Foraging:
                 coin_location = np.append(coin_location, np.array([[np.round(float(row[0])), np.round(float(row[2]))]]),0)
             else:
                 coin_location = np.append(coin_location, np.array([[np.round(float(row[1])), np.round(float(row[3]))]]),0) 
+        
+        if version == 'distr_only': 
+            bool_distribution = np.empty((4))
+            j=0
+            for i in range(len(coin_location)):
+                bool_distribution[0] = (coin_location[j,0]-60)**2 + (coin_location[j,1]-75)**2 <= (2*5)**2
+                bool_distribution[1] = (coin_location[j,0]+15)**2 + (coin_location[j,1]+50)**2 <= (2*11)**2
+                bool_distribution[2] = (coin_location[j,0]+50)**2 + (coin_location[j,1]-30)**2 <= (2*18)**2
+                bool_distribution[3] = (coin_location[j,0]-49)**2 + (coin_location[j,1]+40)**2 <= (2*13)**2
                 
-        bool_distribution = np.empty((4))
-        j=0
-        for i in range(len(coin_location)):
-            bool_distribution[0] = (coin_location[j,0]-60)**2 + (coin_location[j,1]-75)**2 <= (2*5)**2
-            bool_distribution[1] = (coin_location[j,0]+15)**2 + (coin_location[j,1]+50)**2 <= (2*11)**2
-            bool_distribution[2] = (coin_location[j,0]+50)**2 + (coin_location[j,1]-30)**2 <= (2*18)**2
-            bool_distribution[3] = (coin_location[j,0]-49)**2 + (coin_location[j,1]+40)**2 <= (2*13)**2
-            
-            if np.sum(bool_distribution)==0:
-               coin_location = np.delete(coin_location, j, 0) 
-            else:
-               j = j+1                
+                if np.sum(bool_distribution)==0:
+                    coin_location = np.delete(coin_location, j, 0) 
+                else:
+                    j = j+1                
                 
         return coin_location
     
     
-    def ProcessData(Folder, experiment):
-        coin_location = Foraging.CoinLocation(Folder, experiment)
+    def ProcessData(Folder, experiment, version, coins = 'full_coins'):
+        coin_location = Foraging.CoinLocation(Folder, experiment, coins)
         
         with open("4_walls_coins_task/FONC_{}_DeID/fMRI/runNumber{}_position.txt".format(Folder,experiment)) as f:
             data_raw = f.readlines()
@@ -146,14 +187,26 @@ class Foraging:
         Training_set_cleaned = Training_set[np.sort(Training_set_index),:]
         time_cleaned = time[np.sort(Training_set_index)]
 
-        Labels = np.empty((0,1))
-        for i in range(len(Training_set_cleaned)-1):
-            index = Foraging.TransitionCheck4Labels(Training_set_cleaned[i,:], Training_set_cleaned[i+1,:])
-            Labels = np.append(Labels, index)
+        if version == 'complete':
+            Labels = np.empty((0,1))
+            for i in range(len(Training_set_cleaned)-1):
+                index = Foraging.TransitionCheck4Labels(Training_set_cleaned[i,:], Training_set_cleaned[i+1,:])
+                #index = Foraging.TransitionCheck4Labels_simplified(Training_set_cleaned[i,:], Training_set_cleaned[i+1,:])
+                Labels = np.append(Labels, index)
             
-        # % Simulate dynamics
-        Simulated_states = Foraging.StateTransition(Labels, Training_set_cleaned)
-        see_coin_array, reward = Foraging.GeneratePsi(Simulated_states, coin_location)
+            # % Simulate dynamics
+            Simulated_states = Foraging.StateTransition(Labels, Training_set_cleaned)
+            see_coin_array, reward = Foraging.GeneratePsi(Simulated_states, coin_location)
+            
+        if version == 'simplified':
+            Labels = np.empty((0,1))
+            for i in range(len(Training_set_cleaned)-1):
+                index = Foraging.TransitionCheck4Labels_simplified(Training_set_cleaned[i,:], Training_set_cleaned[i+1,:])
+                Labels = np.append(Labels, index)
+            
+            # % Simulate dynamics
+            Simulated_states = Foraging.StateTransition_simplified(Labels, Training_set_cleaned)
+            see_coin_array, reward = Foraging.GeneratePsi(Simulated_states, coin_location)            
             
         return Simulated_states, Labels, time_cleaned, see_coin_array, reward
     
@@ -189,9 +242,27 @@ class Simulation_NN:
         Transition[8,:] = state
         state_plus1 = Transition[int(action),:]
         
-        return state_plus1          
+        return state_plus1     
+
+    def Transition_simplified(state,action):
+        Transition = np.zeros((5,2))
+        Transition[0,0] = state[0,0] + 0.1
+        Transition[0,1] = state[0,1] + 0
+        Transition[1,0] = state[0,0] + 0
+        Transition[1,1] = state[0,1] + 0.1
+        Transition[2,0] = state[0,0] - 0.1
+        Transition[2,1] = state[0,1] + 0
+        Transition[3,0] = state[0,0] + 0
+        Transition[3,1] = state[0,1] - 0.1
+        Transition[4,:] = state
+        state_plus1 = Transition[int(action),:]
+        
+        return state_plus1             
                 
-    def HierarchicalStochasticSampleTrajMDP(self, max_epoch_per_traj, number_of_trajectories, initial_state):
+    def HierarchicalStochasticSampleTrajMDP(self, max_epoch_per_traj, number_of_trajectories, initial_state, version = 'simplified'):
+        
+        # version = simplified, for small action space, or full, for full action space 
+        
         traj = [[None]*1 for _ in range(number_of_trajectories)]
         control = [[None]*1 for _ in range(number_of_trajectories)]
         Option = [[None]*1 for _ in range(number_of_trajectories)]
@@ -263,7 +334,11 @@ class Simulation_NN:
                 u = np.amin(np.where(draw_u<prob_u_rescaled)[1])
             
                 # given action, draw next state
-                state_plus1 = Simulation_NN.Transition(state_partial, u)
+                if version == 'simplified':
+                    state_plus1 = Simulation_NN.Transition_simplified(state_partial, u)
+                elif version =='full':
+                    state_plus1 = Simulation_NN.Transition(state_partial, u)
+                    
                 state_plus1 = state_plus1.reshape(1,2)
                 x = np.append(x, state_plus1, 0)
                 u_tot = np.append(u_tot,u)

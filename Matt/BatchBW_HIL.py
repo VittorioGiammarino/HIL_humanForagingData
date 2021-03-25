@@ -39,10 +39,10 @@ class NN_PI_LO:
                 
     def NN_model(self):
         model = keras.Sequential([
-                keras.layers.Dense(30, activation='relu', input_shape=(self.size_input,),
-                                   kernel_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5, seed=0),
+                keras.layers.Dense(100, activation='relu', input_shape=(self.size_input,),
+                                   kernel_initializer=keras.initializers.RandomUniform(minval=-1, maxval=1, seed=0),
                                    bias_initializer=keras.initializers.Zeros()),
-                keras.layers.Dense(self.action_space, kernel_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5, seed=1)),
+                keras.layers.Dense(self.action_space, kernel_initializer=keras.initializers.RandomUniform(minval=-1, maxval=1, seed=1)),
                 keras.layers.Softmax()
                                  ])              
         return model
@@ -58,6 +58,15 @@ class NN_PI_LO:
     def load(name):
         NN_model = keras.models.load_model(name)
         return NN_model
+    
+    def PreTraining(self, TrainingSet, Labels, Nepoch):
+        model = NN_PI_LO.NN_model(self)
+        model.compile(optimizer='adam',
+                      loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+                      metrics=['accuracy'])
+        model.fit(TrainingSet, Labels, epochs=Nepoch)
+        
+        return model
         
             
 class NN_PI_B:
@@ -100,7 +109,7 @@ class NN_PI_HI:
                 
     def NN_model(self):
         model = keras.Sequential([
-                keras.layers.Dense(100, activation='relu', input_shape=(self.size_input,),
+                keras.layers.Dense(20, activation='relu', input_shape=(self.size_input,),
                                    kernel_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5, seed=4),
                                    bias_initializer=keras.initializers.Zeros()),
                 keras.layers.Dense(self.option_space, kernel_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5, seed=5)),
@@ -120,19 +129,31 @@ class NN_PI_HI:
         NN_model = keras.models.load_model(name)
         return NN_model
     
+    def PreTraining(self, TrainingSet):
+        model = NN_PI_HI.NN_model(self)
+        Labels = TrainingSet[:,2]
+        model.compile(optimizer='adam',
+                      loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+                      metrics=['accuracy'])
+        model.fit(TrainingSet, Labels, epochs=20)
+        
+        return model
+        
+    
 
 class BatchHIL:
-    def __init__(self, TrainingSet, Labels, option_space, M_step_epoch, size_batch, optimizer):
+    def __init__(self, TrainingSet, Labels, option_space, M_step_epoch, size_batch, optimizer, supervised_pi_hi):
         self.TrainingSet = TrainingSet
         self.Labels = Labels
         self.option_space = option_space
         self.size_input = TrainingSet.shape[1]
-        self.action_space = int(np.max(Labels)+1)
+        self.action_space = len(np.unique(Labels))
         self.termination_space = 2
         self.zeta = 0.0001
         self.mu = np.ones(option_space)*np.divide(1,option_space)
         pi_hi = NN_PI_HI(self.option_space, self.size_input)
-        self.NN_options = pi_hi.NN_model()
+        pi_hi_model = pi_hi.PreTraining(self.TrainingSet)
+        self.NN_options = pi_hi_model
         NN_low = []
         NN_termination = []
         pi_lo = NN_PI_LO(self.action_space, self.size_input)
@@ -148,6 +169,8 @@ class BatchHIL:
         self.Lambda_Lb = 1
         self.Lambda_Lv = 0.1
         self.Lambda_DKL = 0.01
+        self.predictions = supervised_pi_hi
+        self.Lambda_DKL_pi_hi = 1
         
     def Pi_hi(ot, Pi_hi_parameterization, state):
         Pi_hi = Pi_hi_parameterization(state)
@@ -393,6 +416,8 @@ class BatchHIL:
         Lv = kb.sum(kb.sum(pi_hi-kb.sum(pi_hi,0)/pi_hi.shape[0],0)/pi_hi.shape[0])
         return Lv
     
+    
+    
     def Regularizer_KL_divergence(NN_actions, TrainingSet, gamma_actions, auxiliary_vector):
         option_space = len(NN_actions)
         DKL = 0
@@ -407,26 +432,49 @@ class BatchHIL:
                     
         return DKL
     
+    def Supervised_pi_hi(pi_hi,predictions):
+        epsilon = 0.000001
+        T = len(predictions)
+        DKL_pi_hi = kb.sum(pi_hi*kb.log(kb.clip(pi_hi/(predictions+epsilon),1e-10,1.0)))/T
+        return DKL_pi_hi
+    
     def Loss(gamma_tilde_reshaped, gamma_reshaped_options, gamma_actions, auxiliary_vector,
-                    NN_termination, NN_options, NN_actions, T, TrainingSet, Lambda_Lb, Lambda_Lv, Lambda_DKL):
+                    NN_termination, NN_options, NN_actions, T, TrainingSet, Lambda_Lb, Lambda_Lv, Lambda_DKL, Lambda_DKL_pi_hi, predictions, version = 'supervised'):
 # =============================================================================
 #         Compute batch loss function to minimize
 # =============================================================================
-        loss = 0
-        option_space = len(NN_actions)
-        for i in range(option_space):
-            pi_b = NN_termination[i](TrainingSet[:],training=True)
-            loss = loss -kb.sum(gamma_tilde_reshaped[:,:,i]*kb.log(kb.clip(pi_b[:],1e-10,1.0)))/(T)
-            pi_lo = NN_actions[i](TrainingSet,training=True)
-            loss = loss -(kb.sum(gamma_actions[:,:,i]*kb.log(kb.clip(pi_lo,1e-10,1.0))))/(T)
+        if version == 'classic':
+            loss = 0
+            option_space = len(NN_actions)
+            for i in range(option_space):
+                pi_b = NN_termination[i](TrainingSet[:],training=True)
+                loss = loss -kb.sum(gamma_tilde_reshaped[:,:,i]*kb.log(kb.clip(pi_b[:],1e-10,1.0)))/(T)
+                pi_lo = NN_actions[i](TrainingSet,training=True)
+                loss = loss -(kb.sum(gamma_actions[:,:,i]*kb.log(kb.clip(pi_lo,1e-10,1.0))))/(T)
+                
+            pi_hi = NN_options(TrainingSet,training=True)
+            loss_options = -kb.sum(gamma_reshaped_options*kb.log(kb.clip(pi_hi,1e-10,1.0)))/(T)
+            loss = loss + loss_options
+            Lb = BatchHIL.Regularizer_Lb(pi_hi)
+            Lv = BatchHIL.Regularizer_Lv(pi_hi)
+            DKL = BatchHIL.Regularizer_KL_divergence(NN_actions, TrainingSet, gamma_actions, auxiliary_vector)
+            loss = loss + Lambda_Lb*Lb - Lambda_Lv*Lv - Lambda_DKL*DKL
             
-        pi_hi = NN_options(TrainingSet,training=True)
-        loss_options = -kb.sum(gamma_reshaped_options*kb.log(kb.clip(pi_hi,1e-10,1.0)))/(T)
-        loss = loss + loss_options
-        Lb = BatchHIL.Regularizer_Lb(pi_hi)
-        Lv = BatchHIL.Regularizer_Lv(pi_hi)
-        DKL = BatchHIL.Regularizer_KL_divergence(NN_actions, TrainingSet, gamma_actions, auxiliary_vector)
-        loss = loss + Lambda_Lb*Lb - Lambda_Lv*Lv - Lambda_DKL*DKL
+        elif version == 'supervised':
+            loss = 0
+            option_space = len(NN_actions)
+            for i in range(option_space):
+                pi_b = NN_termination[i](TrainingSet[:],training=True)
+                loss = loss -kb.sum(gamma_tilde_reshaped[:,:,i]*kb.log(kb.clip(pi_b[:],1e-10,1.0)))/(T)
+                pi_lo = NN_actions[i](TrainingSet,training=True)
+                loss = loss -(kb.sum(gamma_actions[:,:,i]*kb.log(kb.clip(pi_lo,1e-10,1.0))))/(T)
+                
+            pi_hi = NN_options(TrainingSet,training=True)
+            loss_options = -kb.sum(gamma_reshaped_options*kb.log(kb.clip(pi_hi,1e-10,1.0)))/(T)
+            loss = loss + loss_options  
+            DKL = BatchHIL.Regularizer_KL_divergence(NN_actions, TrainingSet, gamma_actions, auxiliary_vector)
+            DKL_pi_hi = BatchHIL.Supervised_pi_hi(pi_hi, predictions)
+            loss = loss + Lambda_DKL_pi_hi*DKL_pi_hi - Lambda_DKL*DKL
     
         return loss 
 
@@ -450,7 +498,7 @@ class BatchHIL:
                 weights.append(self.NN_options.trainable_weights)
                 tape.watch(weights)
                 loss = BatchHIL.Loss(gamma_tilde_reshaped, gamma_reshaped_options, gamma_actions, 
-                                     self.NN_termination, self.NN_options, self.NN_actions, T, self.TrainingSet, self.Lambda_Lb, self.Lambda_Lv, self.Lambda_DKL)
+                                     self.NN_termination, self.NN_options, self.NN_actions, T, self.TrainingSet, self.Lambda_Lb, self.Lambda_Lv, self.Lambda_DKL, self.predictions)
             
             grads = tape.gradient(loss,weights)
             j=0
@@ -483,14 +531,15 @@ class BatchHIL:
                     for i in range(self.option_space):
                         weights.append(self.NN_termination[i].trainable_weights)
                         weights.append(self.NN_actions[i].trainable_weights)
-                    weights.append(self.NN_options.trainable_weights)
+                    #weights.append(self.NN_options.trainable_weights)
                     tape.watch(weights)
                     loss = BatchHIL.Loss(gamma_tilde_reshaped[n*self.size_batch:(n+1)*self.size_batch,:,:], 
                                          gamma_reshaped_options[n*self.size_batch:(n+1)*self.size_batch,:], 
                                          gamma_actions[n*self.size_batch:(n+1)*self.size_batch,:,:], 
                                          auxiliary_vector[n*self.size_batch:(n+1)*self.size_batch,:],
                                          self.NN_termination, self.NN_options, self.NN_actions, self.size_batch, 
-                                         self.TrainingSet[n*self.size_batch:(n+1)*self.size_batch,:], self.Lambda_Lb, self.Lambda_Lv, self.Lambda_DKL)
+                                         self.TrainingSet[n*self.size_batch:(n+1)*self.size_batch,:], self.Lambda_Lb, self.Lambda_Lv, self.Lambda_DKL, self.Lambda_DKL_pi_hi, 
+                                         self.predictions[n*self.size_batch:(n+1)*self.size_batch])
             
                 grads = tape.gradient(loss,weights)
                 j=0
@@ -498,7 +547,7 @@ class BatchHIL:
                     self.optimizer.apply_gradients(zip(grads[i][:], self.NN_termination[j].trainable_weights))
                     self.optimizer.apply_gradients(zip(grads[i+1][:], self.NN_actions[j].trainable_weights))
                     j = j+1
-                self.optimizer.apply_gradients(zip(grads[-1][:], self.NN_options.trainable_weights))
+                #self.optimizer.apply_gradients(zip(grads[-1][:], self.NN_options.trainable_weights))
                 print('loss:', float(loss))
         
         return loss   
@@ -530,7 +579,7 @@ class BatchHIL:
 # =============================================================================
         
         T = self.TrainingSet.shape[0]
-        likelihood = np.empty((0))
+        likelihood = BatchHIL.likelihood_approximation(self)
             
         for n in range(N):
             print('iter Loss', n+1, '/', N)
