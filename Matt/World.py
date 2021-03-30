@@ -163,7 +163,31 @@ class Foraging:
                 
         return coin_location
     
+    def TrueData(Folder, experiment):
+        
+        with open("4_walls_coins_task/FONC_{}_DeID/fMRI/runNumber{}_position.txt".format(Folder,experiment)) as f:
+            data_raw = f.readlines()
     
+        for i in range(len(data_raw)):
+            row = data_raw[i][1:]
+            row = row.replace(']', ',')
+            data_raw[i] = row
+
+        agent_data = csv.reader(data_raw)
+        Training_set = np.empty((0,2))
+        time = np.empty((0,1))
+
+        for row in agent_data:
+            Training_set = np.append(Training_set, np.array([[np.round(float(row[0])), np.round(float(row[2]))]]), 0)
+            time = np.append(time, float(row[3]))    
+            
+        State_space, Training_set_index = np.unique(Training_set, return_index=True, axis = 0)    
+        Training_set_cleaned = Training_set[np.sort(Training_set_index),:]
+        time_cleaned = time[np.sort(Training_set_index)]
+        
+        return Training_set_cleaned, time_cleaned
+            
+        
     def ProcessData(Folder, experiment, version, coins = 'full_coins'):
         coin_location = Foraging.CoinLocation(Folder, experiment, coins)
         
@@ -192,7 +216,10 @@ class Foraging:
             for i in range(len(Training_set_cleaned)-1):
                 index = Foraging.TransitionCheck4Labels(Training_set_cleaned[i,:], Training_set_cleaned[i+1,:])
                 #index = Foraging.TransitionCheck4Labels_simplified(Training_set_cleaned[i,:], Training_set_cleaned[i+1,:])
-                Labels = np.append(Labels, index)
+                if index == 8:
+                    dummy = 0
+                else:
+                    Labels = np.append(Labels, index)
             
             # % Simulate dynamics
             Simulated_states = Foraging.StateTransition(Labels, Training_set_cleaned)
@@ -202,7 +229,10 @@ class Foraging:
             Labels = np.empty((0,1))
             for i in range(len(Training_set_cleaned)-1):
                 index = Foraging.TransitionCheck4Labels_simplified(Training_set_cleaned[i,:], Training_set_cleaned[i+1,:])
-                Labels = np.append(Labels, index)
+                if index == 4:
+                    dummy = 0
+                else:
+                    Labels = np.append(Labels, index)
             
             # % Simulate dynamics
             Simulated_states = Foraging.StateTransition_simplified(Labels, Training_set_cleaned)
@@ -259,7 +289,7 @@ class Simulation_NN:
         
         return state_plus1             
                 
-    def HierarchicalStochasticSampleTrajMDP(self, max_epoch_per_traj, number_of_trajectories, initial_state, version = 'simplified'):
+    def HierarchicalStochasticSampleTrajMDP(self, max_epoch_per_traj, number_of_trajectories, initial_state, version = 'full'):
         
         # version = simplified, for small action space, or full, for full action space 
         
@@ -398,4 +428,151 @@ class Simulation_NN:
             reward = np.append(reward,r)
 
             return traj, control, Option, Termination, psi_evolution, reward
+        
+        
+    def HierarchicalStochasticSampleTrajMDP_simple_param(self, max_epoch_per_traj, number_of_trajectories, initial_state, version = 'full'):
+            
+            # version = simplified, for small action space, or full, for full action space 
+            
+            traj = [[None]*1 for _ in range(number_of_trajectories)]
+            control = [[None]*1 for _ in range(number_of_trajectories)]
+            Option = [[None]*1 for _ in range(number_of_trajectories)]
+            Termination = [[None]*1 for _ in range(number_of_trajectories)]
+            reward = np.empty((0,0),int)
+            psi_evolution = [[None]*1 for _ in range(number_of_trajectories)]
+            
+            coin_location = 0.1*Foraging.CoinLocation(6, 1)
+        
+            for t in range(0,number_of_trajectories):       
+                x = np.empty((0,2))
+                x = np.append(x, initial_state.reshape(1,2), 0)
+                u_tot = np.empty((0,0))
+                o_tot = np.empty((0,0),int)
+                b_tot = np.empty((0,0),int)
+                psi_tot = np.empty((0,0),int)
+                psi = 0
+                psi_tot = np.append(psi_tot, psi)
+                r=0
+            
+                # Initial Option
+                prob_o = self.mu
+                prob_o_rescaled = np.divide(prob_o, np.amin(prob_o)+0.01)
+                for i in range(1,prob_o_rescaled.shape[0]):
+                    prob_o_rescaled[i]=prob_o_rescaled[i]+prob_o_rescaled[i-1]
+                draw_o=np.divide(np.random.rand(), np.amin(prob_o)+0.01)
+                o = np.amin(np.where(draw_o<prob_o_rescaled))
+                o_tot = np.append(o_tot,o)
+            
+                # Termination
+                state_partial = x[0,:].reshape(1,2)
+                state = np.concatenate((state_partial,[[psi]]),1)
+                if o == 0:
+                    prob_b = self.pi_b(state).numpy()
+                if o == 1: 
+                    prob_b = 1 - self.pi_b(state).numpy()
+                prob_b_rescaled = np.divide(prob_b,np.amin(prob_b)+0.01)
+                for i in range(1,prob_b_rescaled.shape[1]):
+                    prob_b_rescaled[0,i]=prob_b_rescaled[0,i]+prob_b_rescaled[0,i-1]
+                draw_b = np.divide(np.random.rand(), np.amin(prob_b)+0.01)
+                b = np.amin(np.where(draw_b<prob_b_rescaled)[1])
+                b_tot = np.append(b_tot,b)
+                if b == 1:
+                    b_bool = True
+                else:
+                    b_bool = False
+            
+                o_prob_tilde = np.empty((1,self.option_space))
+                if b_bool == True:
+                    o_prob_tilde = self.pi_hi(state).numpy()
+                else:
+                    o_prob_tilde[0,:] = self.zeta/self.option_space*np.ones((1,self.option_space))
+                    o_prob_tilde[0,o] = 1 - self.zeta + self.zeta/self.option_space
+                
+                prob_o = o_prob_tilde
+                prob_o_rescaled = np.divide(prob_o, np.amin(prob_o)+0.01)
+                for i in range(1,prob_o_rescaled.shape[1]):
+                    prob_o_rescaled[0,i]=prob_o_rescaled[0,i]+prob_o_rescaled[0,i-1]
+                draw_o=np.divide(np.random.rand(), np.amin(prob_o)+0.01)
+                o = np.amin(np.where(draw_o<prob_o_rescaled)[1])
+                o_tot = np.append(o_tot,o)
+            
+                for k in range(0,max_epoch_per_traj):
+                    state_partial = x[k,:].reshape((1,2))
+                    state = np.concatenate((state_partial,[[psi]]),1)
+                    # draw action
+                    prob_u = self.pi_lo[o](state).numpy()
+                    prob_u_rescaled = np.divide(prob_u,np.amin(prob_u)+0.01)
+                    for i in range(1,prob_u_rescaled.shape[1]):
+                        prob_u_rescaled[0,i]=prob_u_rescaled[0,i]+prob_u_rescaled[0,i-1]
+                    draw_u=np.divide(np.random.rand(),np.amin(prob_u)+0.01)
+                    u = np.amin(np.where(draw_u<prob_u_rescaled)[1])
+                
+                    # given action, draw next state
+                    if version == 'simplified':
+                        state_plus1 = Simulation_NN.Transition_simplified(state_partial, u)
+                    elif version =='full':
+                        state_plus1 = Simulation_NN.Transition(state_partial, u)
+                        
+                    state_plus1 = state_plus1.reshape(1,2)
+                    x = np.append(x, state_plus1, 0)
+                    u_tot = np.append(u_tot,u)
+                    
+                    # Update psi and reward
+                    dist_from_coins = np.linalg.norm(coin_location-state_plus1,2,1)
+                    l=0
+                    psi = 0
+                    for p in range(len(dist_from_coins)):
+                        if dist_from_coins[p]<=0.8:
+                            psi = 1
+                        if dist_from_coins[p]<=0.3:
+                            coin_location = np.delete(coin_location, l, 0)
+                            r = r+1
+                        else:
+                            l=l+1
+                        
+                    psi_tot = np.append(psi_tot, psi)              
+                            
+                    # Select Termination
+                    # Termination
+                    state_plus1_partial = x[k+1,:].reshape((1,2))
+                    state_plus1 = np.concatenate((state_plus1_partial,[[psi]]),1)
+                    if o == 0:
+                        prob_b = self.pi_b(state).numpy()
+                    if o == 1: 
+                        prob_b = 1 - self.pi_b(state).numpy()
+                    prob_b_rescaled = np.divide(prob_b,np.amin(prob_b)+0.01)
+                    for i in range(1,prob_b_rescaled.shape[1]):
+                        prob_b_rescaled[0,i]=prob_b_rescaled[0,i]+prob_b_rescaled[0,i-1]
+                    draw_b = np.divide(np.random.rand(), np.amin(prob_b)+0.01)
+                    b = np.amin(np.where(draw_b<prob_b_rescaled)[1])
+                    b_tot = np.append(b_tot,b)
+                    if b == 1:
+                        b_bool = True
+                    else:
+                        b_bool = False
+            
+                    o_prob_tilde = np.empty((1,self.option_space))
+                    if b_bool == True:
+                        o_prob_tilde = self.pi_hi(state_plus1).numpy()
+                    else:
+                        o_prob_tilde[0,:] = self.zeta/self.option_space*np.ones((1,self.option_space))
+                        o_prob_tilde[0,o] = 1 - self.zeta + self.zeta/self.option_space
+                
+                    prob_o = o_prob_tilde
+                    prob_o_rescaled = np.divide(prob_o, np.amin(prob_o)+0.01)
+                    for i in range(1,prob_o_rescaled.shape[1]):
+                        prob_o_rescaled[0,i]=prob_o_rescaled[0,i]+prob_o_rescaled[0,i-1]
+                    draw_o=np.divide(np.random.rand(), np.amin(prob_o)+0.01)
+                    o = np.amin(np.where(draw_o<prob_o_rescaled)[1])
+                    o_tot = np.append(o_tot,o)
+                
+            
+                traj[t] = x
+                control[t]=u_tot
+                Option[t]=o_tot
+                Termination[t]=b_tot
+                psi_evolution[t] = psi_tot                
+                reward = np.append(reward,r)
+    
+                return traj, control, Option, Termination, psi_evolution, reward        
             
