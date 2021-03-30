@@ -16,13 +16,13 @@ from utils_main import Show_DataSet
 
 # %% Preprocessing_data with psi based on the coins clusters distribution  
 Folders = [6] #[6, 7, 11, 12, 15]
-size_data = 1500
+size_data = 3000
 Rand_traj = 1
 
 TrainingSet, Labels, Trajectories, Rotation, Time = Show_DataSet(Folders, size_data, Rand_traj, 'complete', 'distr_only')
-_,_,_,_,_ = Show_DataSet(Folders, size_data, Rand_traj, 'simplified', 'distr_only')
-_,_,_,_,_  = Show_DataSet(Folders, size_data, Rand_traj, 'complete', 'full_coins')
-_,_,_,_,_  = Show_DataSet(Folders, size_data, Rand_traj, 'simplified', 'full_coins')
+# _,_,_,_,_ = Show_DataSet(Folders, size_data, Rand_traj, 'simplified', 'distr_only')
+# _,_,_,_,_  = Show_DataSet(Folders, size_data, Rand_traj, 'complete', 'full_coins')
+# _,_,_,_,_  = Show_DataSet(Folders, size_data, Rand_traj, 'simplified', 'full_coins')
 
 # %% train_pi_hi
 T_set = Trajectories[Rand_traj][0:size_data,:]
@@ -68,7 +68,8 @@ option_space = 2
 M_step_epoch = 10
 size_batch = 32
 optimizer = keras.optimizers.Adamax(learning_rate=1e-1)
-Agent_BatchHIL = BatchBW_HIL.BatchHIL_param_simplified(T_set, Heading_set, M_step_epoch, size_batch, optimizer, options_predictions)
+# Agent_BatchHIL = BatchBW_HIL.BatchHIL_param_simplified(T_set, Heading_set, M_step_epoch, size_batch, optimizer) 
+Agent_BatchHIL = BatchBW_HIL.BatchHIL(T_set, Heading_set, option_space, M_step_epoch, size_batch, optimizer, options_predictions)
 N=10 #number of iterations for the BW algorithm
 start_batch_time = time.time()
 pi_hi_batch, pi_lo_batch, pi_b_batch, likelihood = Agent_BatchHIL.Baum_Welch(N)
@@ -83,7 +84,7 @@ likelihood_temp = Agent_BatchHIL.likelihood_approximation()
 coins_location = World.Foraging.CoinLocation(6, Rand_traj+1, 'full_coins')
 for traj in range(1):
     BatchSim = World.Simulation_NN(pi_hi_batch, pi_lo_batch, pi_b_batch)
-    [trajBatch, controlBatch, OptionsBatch, TerminationBatch, psiBatch, rewardBatch] = BatchSim.HierarchicalStochasticSampleTrajMDP_simple_param(3000,1,np.array([-10,-10]))
+    [trajBatch, controlBatch, OptionsBatch, TerminationBatch, psiBatch, rewardBatch] = BatchSim.HierarchicalStochasticSampleTrajMDP(3000,1,np.array([-7.5,7.5]))
 
     # Plot result
 
@@ -97,7 +98,7 @@ for traj in range(1):
     circle4 = plt.Circle((4.9, -4), 2*sigma4, color='k',  fill=False)
     fig, ax2 = plt.subplots()
     plot_data = plt.scatter(trajBatch[0][:,0], trajBatch[0][:,1], c=OptionsBatch[0][1:], marker='o', cmap='bwr')
-    plt.plot(0.1*coins_location[:,0], 0.1*coins_location[:,1], 'xk')
+    #plt.plot(0.1*coins_location[:,0], 0.1*coins_location[:,1], 'xk')
     cbar = fig.colorbar(plot_data, ticks=[0, 1])
     cbar.ax.set_yticklabels(['option 1', 'option 2'])
     ax2.add_artist(circle1)

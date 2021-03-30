@@ -105,9 +105,8 @@ class NN_PI_B:
         NN_model = keras.models.load_model(name)
         return NN_model    
 
-    def PreTraining(self, TrainingSet):
+    def PreTraining(self, TrainingSet, Labels):
         model = NN_PI_B.NN_model(self)
-        Labels = TrainingSet[:,2]
         model.compile(optimizer='adam',
                       loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
                       metrics=['accuracy'])
@@ -163,22 +162,42 @@ class BatchHIL:
         self.Labels = Labels
         self.option_space = option_space
         self.size_input = TrainingSet.shape[1]
-        self.action_space = len(np.unique(Labels))
+        self.action_space = 8 #len(np.unique(Labels))
         self.termination_space = 2
         self.zeta = 0.0001
         self.mu = np.ones(option_space)*np.divide(1,option_space)
         pi_hi = NN_PI_HI(self.option_space, self.size_input)
         pi_hi_model = pi_hi.PreTraining(self.TrainingSet)
         self.NN_options = pi_hi_model
-        NN_low = []
-        NN_termination = []
-        pi_lo = NN_PI_LO(self.action_space, self.size_input)
-        pi_b = NN_PI_B(self.termination_space, self.size_input)
-        for options in range(self.option_space):
-            NN_low.append(pi_lo.NN_model())
-            NN_termination.append(pi_b.NN_model())
-        self.NN_actions = NN_low
-        self.NN_termination = NN_termination
+        
+        if option_space==2:
+            NN_low = []
+            NN_termination = []
+            pi_lo = NN_PI_LO(self.action_space, self.size_input)
+            for options in range(self.option_space):
+                NN_low.append(pi_lo.NN_model())
+            self.NN_actions = NN_low
+            pi_b = NN_PI_B(self.termination_space, self.size_input)
+            Labels_b1 = TrainingSet[:,2]
+            pi_b_model1 = pi_b.PreTraining(TrainingSet, Labels_b1)
+            NN_termination.append(pi_b_model1)
+            index_zero = np.where(Labels_b1 == 0)[0]
+            Labels_b2 = np.zeros(len(TrainingSet[:,2]))
+            Labels_b2[index_zero]=1
+            pi_b_model2 = pi_b.PreTraining(TrainingSet, Labels_b2)
+            NN_termination.append(pi_b_model2)            
+            self.NN_termination = NN_termination
+        else:
+            NN_low = []
+            NN_termination = []
+            pi_lo = NN_PI_LO(self.action_space, self.size_input)
+            pi_b = NN_PI_B(self.termination_space, self.size_input)
+            for options in range(self.option_space):
+                NN_low.append(pi_lo.NN_model())
+                NN_termination.append(pi_b.NN_model())
+            self.NN_actions = NN_low
+            self.NN_termination = NN_termination
+            
         self.epochs = M_step_epoch
         self.size_batch = size_batch
         self.optimizer = optimizer
@@ -279,7 +298,7 @@ class BatchHIL:
         # =============================================================================
         #     beta is the backward message: beta.shape()= [option_space, termination_space]
         # =============================================================================
-        beta = np.empty((option_space, termination_space))
+        beta = np.zeros((option_space, termination_space))
         for i1 in range(option_space):
             ot = i1
             for i2 in range(termination_space):
@@ -317,15 +336,15 @@ class BatchHIL:
         return alpha
 
     def Beta(self):
-        beta = np.empty((self.option_space,self.termination_space,len(self.TrainingSet)))
-        beta[:,:,len(self.TrainingSet)-1] = np.divide(np.ones((self.option_space,self.termination_space)),2*self.option_space)
+        beta = np.empty((self.option_space,self.termination_space,len(self.TrainingSet)+1))
+        beta[:,:,len(self.TrainingSet)] = np.divide(np.ones((self.option_space,self.termination_space)),2*self.option_space)
     
-        for t_raw in range(len(self.TrainingSet)-1):
+        for t_raw in range(len(self.TrainingSet)):
             t = len(self.TrainingSet) - (t_raw+1)
-            print('beta iter', t_raw+1, '/', len(self.TrainingSet)-1)
+            print('beta iter', t_raw+1, '/', len(self.TrainingSet))
             state = self.TrainingSet[t,:].reshape(1,len(self.TrainingSet[t,:]))
             action = self.Labels[t]
-            beta[:,:,t-1] = BatchHIL.BackwardRecursion(beta[:,:,t], action, self.NN_options, 
+            beta[:,:,t] = BatchHIL.BackwardRecursion(beta[:,:,t+1], action, self.NN_options, 
                                                        self.NN_actions, self.NN_termination, state, self.zeta, 
                                                        self.option_space, self.termination_space)
         
@@ -337,13 +356,14 @@ class BatchHIL:
             ot=i1
             for i2 in range(termination_space):
                 gamma[ot,i2] = alpha[ot,i2]*beta[ot,i2]     
-            gamma = np.divide(gamma,np.sum(gamma))
+                
+        gamma = np.divide(gamma,np.sum(gamma))
     
         return gamma
 
     def DoubleSmoothing(beta, alpha, a, Pi_hi_parameterization, Pi_lo_parameterization, 
                     Pi_b_parameterization, state, zeta, option_space, termination_space):
-        gamma_tilde = np.empty((option_space, termination_space))
+        gamma_tilde = np.zeros((option_space, termination_space))
         for i1_past in range(option_space):
             ot_past = i1_past
             for i2 in range(termination_space):
@@ -464,7 +484,7 @@ class BatchHIL:
             option_space = len(NN_actions)
             for i in range(option_space):
                 pi_b = NN_termination[i](TrainingSet[:],training=True)
-                loss = loss -kb.sum(gamma_tilde_reshaped[:,:,i]*kb.log(kb.clip(pi_b[:],1e-10,1.0)))/(T)
+                loss = loss -(kb.sum(gamma_tilde_reshaped[:,:,i]*kb.log(kb.clip(pi_b[:],1e-10,1.0))))/(T)
                 pi_lo = NN_actions[i](TrainingSet,training=True)
                 loss = loss -(kb.sum(gamma_actions[:,:,i]*kb.log(kb.clip(pi_lo,1e-10,1.0))))/(T)
                 
@@ -481,15 +501,15 @@ class BatchHIL:
             option_space = len(NN_actions)
             for i in range(option_space):
                 pi_b = NN_termination[i](TrainingSet[:],training=True)
-                loss = loss -kb.sum(gamma_tilde_reshaped[:,:,i]*kb.log(kb.clip(pi_b[:],1e-10,1.0)))/(T)
+                loss = loss -(kb.sum(gamma_tilde_reshaped[:,:,i]*kb.log(kb.clip(pi_b[:],1e-10,1.0))))/(T)
                 pi_lo = NN_actions[i](TrainingSet,training=True)
                 loss = loss -(kb.sum(gamma_actions[:,:,i]*kb.log(kb.clip(pi_lo,1e-10,1.0))))/(T)
                 
             pi_hi = NN_options(TrainingSet,training=True)
             loss_options = -kb.sum(gamma_reshaped_options*kb.log(kb.clip(pi_hi,1e-10,1.0)))/(T)
             loss = loss + loss_options  
-            DKL = BatchHIL.Regularizer_KL_divergence(NN_actions, TrainingSet, gamma_actions, auxiliary_vector)
-            DKL_pi_hi = BatchHIL.Supervised_pi_hi(pi_hi, predictions)
+            # DKL = BatchHIL.Regularizer_KL_divergence(NN_actions, TrainingSet, gamma_actions, auxiliary_vector)
+            # DKL_pi_hi = BatchHIL.Supervised_pi_hi(pi_hi, predictions)
             loss = loss #+ Lambda_DKL_pi_hi*DKL_pi_hi - Lambda_DKL*DKL
     
         return loss 
@@ -595,7 +615,7 @@ class BatchHIL:
 # =============================================================================
         
         T = self.TrainingSet.shape[0]
-        likelihood = BatchHIL.likelihood_approximation(self)
+        likelihood = [] #BatchHIL.likelihood_approximation(self)
             
         for n in range(N):
             print('iter Loss', n+1, '/', N)
@@ -603,7 +623,7 @@ class BatchHIL:
             alpha = BatchHIL.Alpha(self)
             beta = BatchHIL.Beta(self)
             gamma = BatchHIL.Gamma(self, alpha, beta)
-            gamma_tilde = BatchHIL.GammaTilde(self, beta, alpha)
+            gamma_tilde = BatchHIL.GammaTilde(self, alpha, beta)
         
             print('Expectation done')
             print('Starting maximization step')
@@ -620,16 +640,16 @@ class BatchHIL:
     
 
             loss = BatchHIL.OptimizeLossBatch(self, gamma_tilde_reshaped, gamma_reshaped_options, gamma_actions, auxiliary_vector)
-            likelihood = np.append(likelihood, BatchHIL.likelihood_approximation(self))
 
         print('Maximization done, Total Loss:',float(loss))#float(loss_options+loss_action+loss_termination))
+        likelihood = np.append(likelihood, BatchHIL.likelihood_approximation(self))
 
         
         return self.NN_options, self.NN_actions, self.NN_termination, likelihood
 
             
 class BatchHIL_param_simplified:
-    def __init__(self, TrainingSet, Labels, M_step_epoch, size_batch, optimizer, supervised_pi_hi):
+    def __init__(self, TrainingSet, Labels, M_step_epoch, size_batch, optimizer):
         self.TrainingSet = TrainingSet
         self.Labels = Labels
         option_space = 2
@@ -639,14 +659,35 @@ class BatchHIL_param_simplified:
         self.termination_space = 2
         self.zeta = 0
         self.mu = np.ones(option_space)*np.divide(1,option_space)
+        
         pi_hi = NN_PI_HI(self.option_space, self.size_input)
         pi_hi_model = pi_hi.PreTraining(self.TrainingSet)
         self.NN_options = pi_hi_model
-        pi_b = NN_PI_B(self.option_space, self.size_input)
-        pi_b_model = pi_b.PreTraining(self.TrainingSet)
+        pi_b = NN_PI_B(self.termination_space, self.size_input)
+        lab = TrainingSet[:,2]
+        pi_b_model = pi_b.PreTraining(TrainingSet, lab)
         self.NN_termination = pi_b_model
         NN_low = []
-        pi_lo = NN_PI_LO(self.action_space, self.size_input)
+        # options_predictions = pi_hi_model.predict(self.TrainingSet)    
+        # options = np.argmax(options_predictions,1).reshape(len(self.TrainingSet))
+        # op1 = np.where(options == 0)[0]
+        # op2 = np.where(options == 1)[0]
+
+        # #option1
+        # T_set_op1 = self.TrainingSet[op1,:]
+        # Labels_op1 = self.Labels[op1,:]
+        # pi_lo_op1 = NN_PI_LO(self.action_space,self.size_input)
+        # pi_lo_model1 = pi_lo_op1.PreTraining(T_set_op1, Labels_op1, 1000)
+        # NN_low.append(pi_lo_model1)            
+
+        # #option2
+        # T_set_op2 = self.TrainingSet[op2,:]
+        # Labels_op2 = self.Labels[op2,:]
+        # pi_lo_op2 = NN_PI_LO(self.action_space,self.size_input)
+        # pi_lo_model2 = pi_lo_op2.PreTraining(T_set_op2, Labels_op2, 1000)
+        # NN_low.append(pi_lo_model2) 
+        
+        pi_lo = NN_PI_LO(self.action_space, self.size_input)            
         for options in range(self.option_space):
             NN_low.append(pi_lo.NN_model())
         self.NN_actions = NN_low
@@ -656,7 +697,6 @@ class BatchHIL_param_simplified:
         self.Lambda_Lb = 1
         self.Lambda_Lv = 0.1
         self.Lambda_DKL = 0.01
-        self.predictions = supervised_pi_hi
         self.Lambda_DKL_pi_hi = 1
         
     def Pi_hi(ot, Pi_hi_parameterization, state):
@@ -810,12 +850,13 @@ class BatchHIL_param_simplified:
         return beta
 
     def Smoothing(option_space, termination_space, alpha, beta):
-        gamma = np.empty((option_space, termination_space))
+        gamma = np.zeros((option_space, termination_space))
         for i1 in range(option_space):
             ot=i1
             for i2 in range(termination_space):
-                gamma[ot,i2] = alpha[ot,i2]*beta[ot,i2]     
-            gamma = np.divide(gamma,np.sum(gamma))
+                gamma[ot,i2] = alpha[ot,i2]*beta[ot,i2]
+                
+        gamma = np.divide(gamma,np.sum(gamma))
     
         return gamma
 
@@ -933,7 +974,7 @@ class BatchHIL_param_simplified:
         return DKL_pi_hi
     
     def Loss(gamma_tilde_reshaped, gamma_reshaped_options, gamma_actions, auxiliary_vector,
-                    NN_termination, NN_options, NN_actions, T, TrainingSet, Lambda_Lb, Lambda_Lv, Lambda_DKL, Lambda_DKL_pi_hi, predictions, version = 'supervised'):
+                    NN_termination, NN_options, NN_actions, T, TrainingSet, Lambda_Lb, Lambda_Lv, Lambda_DKL, Lambda_DKL_pi_hi, version = 'supervised'):
 # =============================================================================
 #         Compute batch loss function to minimize
 # =============================================================================
@@ -1000,7 +1041,7 @@ class BatchHIL_param_simplified:
                 weights.append(self.NN_termination.trainable_weights)
                 tape.watch(weights)
                 loss = BatchHIL_param_simplified.Loss(gamma_tilde_reshaped, gamma_reshaped_options, gamma_actions, 
-                                     self.NN_termination, self.NN_options, self.NN_actions, T, self.TrainingSet, self.Lambda_Lb, self.Lambda_Lv, self.Lambda_DKL, self.predictions)
+                                     self.NN_termination, self.NN_options, self.NN_actions, T, self.TrainingSet, self.Lambda_Lb, self.Lambda_Lv, self.Lambda_DKL)
             
             grads = tape.gradient(loss,weights)
             for i in range(0,self.option_space):
@@ -1038,8 +1079,7 @@ class BatchHIL_param_simplified:
                                          gamma_actions[n*self.size_batch:(n+1)*self.size_batch,:,:], 
                                          auxiliary_vector[n*self.size_batch:(n+1)*self.size_batch,:],
                                          self.NN_termination, self.NN_options, self.NN_actions, self.size_batch, 
-                                         self.TrainingSet[n*self.size_batch:(n+1)*self.size_batch,:], self.Lambda_Lb, self.Lambda_Lv, self.Lambda_DKL, self.Lambda_DKL_pi_hi, 
-                                         self.predictions[n*self.size_batch:(n+1)*self.size_batch])
+                                         self.TrainingSet[n*self.size_batch:(n+1)*self.size_batch,:], self.Lambda_Lb, self.Lambda_Lv, self.Lambda_DKL, self.Lambda_DKL_pi_hi)
             
                 grads = tape.gradient(loss,weights)
                 for i in range(0,self.option_space):
@@ -1102,9 +1142,9 @@ class BatchHIL_param_simplified:
     
 
             loss = BatchHIL_param_simplified.OptimizeLossBatch(self, gamma_tilde_reshaped, gamma_reshaped_options, gamma_actions, auxiliary_vector)
-            likelihood = np.append(likelihood, BatchHIL_param_simplified.likelihood_approximation(self))
 
         print('Maximization done, Total Loss:',float(loss))#float(loss_options+loss_action+loss_termination))
+        likelihood = np.append(likelihood, BatchHIL_param_simplified.likelihood_approximation(self))
 
         
         return self.NN_options, self.NN_actions, self.NN_termination, likelihood        
