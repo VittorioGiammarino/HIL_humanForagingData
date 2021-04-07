@@ -7,6 +7,7 @@ Created on Tue Nov 24 17:13:05 2020
 """
 
 import numpy as np
+from sklearn.preprocessing import OneHotEncoder
 import csv
 
 class Foraging:    
@@ -105,13 +106,43 @@ class Foraging:
             
         return sim
     
-    def GeneratePsi(Simulated_states, coin_location):      
+    def GetDirectionFromAngle(angle, version):
+        
+        if version == 'simplified':
+            if angle<0:
+                angle = angle + 360
+            slots = np.arange(45,410,90)
+            label_direction = np.min(np.where(angle<=slots)[0])
+            if label_direction==4:
+                label_direction = 0
+            
+        elif version == 'complete':
+            if angle<0:
+                angle = angle + 360
+            slots = np.arange(22.5,410,45)
+            label_direction = np.min(np.where(angle<=slots)[0])
+            if label_direction==8:
+                label_direction = 0            
+         
+        return label_direction
+    
+    def GeneratePsi(Simulated_states, coin_location, version):      
         reward = 0
         see_coin_array = np.empty((0))
+        coin_direction_array = np.empty((0))
         for i in range(len(Simulated_states)):
             see_coin = 0
             dist_from_coins = np.linalg.norm(coin_location-Simulated_states[i,:],2,1)
             l=0
+            if np.min(dist_from_coins)<=8:
+                index_min = np.argmin(dist_from_coins,0)
+                closer_coin_position = coin_location[index_min,:]
+                closer_coin_relative_position = np.array([closer_coin_position[0]-Simulated_states[i,0],closer_coin_position[1]-Simulated_states[i,1]])
+                angle = np.arctan2(closer_coin_relative_position[1],closer_coin_relative_position[0])*180/np.pi
+                coin_direction = Foraging.GetDirectionFromAngle(angle, version)  
+            else:
+                coin_direction = 8                
+                
             for k in range(len(dist_from_coins)):
                 if dist_from_coins[k]<=8:
                     see_coin = 1
@@ -121,9 +152,10 @@ class Foraging:
                 else:
                     l=l+1
                     
-            see_coin_array = np.append(see_coin_array, see_coin)
+            see_coin_array = np.append(see_coin_array, see_coin)                 
+            coin_direction_array = np.append(coin_direction_array, coin_direction)
                        
-        return see_coin_array, reward
+        return see_coin_array, coin_direction_array, reward
     
     def CoinLocation(Folder, experiment, version = 'distr_only'):
         N_coins = 325
@@ -223,7 +255,7 @@ class Foraging:
             
             # % Simulate dynamics
             Simulated_states = Foraging.StateTransition(Labels, Training_set_cleaned)
-            see_coin_array, reward = Foraging.GeneratePsi(Simulated_states, coin_location)
+            see_coin_array, coin_direction_array, reward = Foraging.GeneratePsi(Simulated_states, coin_location, version)
             
         if version == 'simplified':
             Labels = np.empty((0,1))
@@ -236,9 +268,9 @@ class Foraging:
             
             # % Simulate dynamics
             Simulated_states = Foraging.StateTransition_simplified(Labels, Training_set_cleaned)
-            see_coin_array, reward = Foraging.GeneratePsi(Simulated_states, coin_location)            
+            see_coin_array, coin_direction_array, reward = Foraging.GeneratePsi(Simulated_states, coin_location, version)            
             
-        return Simulated_states, Labels, time_cleaned, see_coin_array, reward
+        return Simulated_states, Labels, time_cleaned, see_coin_array, coin_direction_array, reward
     
     
 class Simulation_NN:
@@ -289,18 +321,18 @@ class Simulation_NN:
         
         return state_plus1             
                 
-    def HierarchicalStochasticSampleTrajMDP(self, max_epoch_per_traj, number_of_trajectories, initial_state, version = 'full'):
+    def HierarchicalStochasticSampleTrajMDP(self, max_epoch_per_traj, number_of_trajectories, initial_state, Folder, expert_traj, version = 'complete'):
         
-        # version = simplified, for small action space, or full, for full action space 
-        
+        # version = simplified, for small action space, or complete, for full action space 
         traj = [[None]*1 for _ in range(number_of_trajectories)]
         control = [[None]*1 for _ in range(number_of_trajectories)]
         Option = [[None]*1 for _ in range(number_of_trajectories)]
         Termination = [[None]*1 for _ in range(number_of_trajectories)]
         reward = np.empty((0,0),int)
         psi_evolution = [[None]*1 for _ in range(number_of_trajectories)]
+        closest_coin_direction = [[None]*1 for _ in range(number_of_trajectories)]
         
-        coin_location = 0.1*Foraging.CoinLocation(6, 1)
+        coin_location = 0.1*Foraging.CoinLocation(Folder, expert_traj+1)
     
         for t in range(0,number_of_trajectories):       
             x = np.empty((0,2))
@@ -309,8 +341,15 @@ class Simulation_NN:
             o_tot = np.empty((0,0),int)
             b_tot = np.empty((0,0),int)
             psi_tot = np.empty((0,0),int)
+            coin_direction_tot = np.empty((0,0),int)
             psi = 0
             psi_tot = np.append(psi_tot, psi)
+            psi_encoded = np.zeros((1,2))
+            psi_encoded[0,psi] = 1
+            coin_direction = 8
+            coin_direction_tot = np.append(coin_direction_tot, coin_direction)
+            coin_dir_encoded = np.zeros((1,9))
+            coin_dir_encoded[0,coin_direction]=1
             r=0
         
             # Initial Option
@@ -324,7 +363,7 @@ class Simulation_NN:
         
             # Termination
             state_partial = x[0,:].reshape(1,2)
-            state = np.concatenate((state_partial,[[psi]]),1)
+            state = np.concatenate((state_partial, psi_encoded, coin_dir_encoded),1)
             prob_b = self.pi_b[o](state).numpy()
             prob_b_rescaled = np.divide(prob_b,np.amin(prob_b)+0.01)
             for i in range(1,prob_b_rescaled.shape[1]):
@@ -354,7 +393,7 @@ class Simulation_NN:
         
             for k in range(0,max_epoch_per_traj):
                 state_partial = x[k,:].reshape((1,2))
-                state = np.concatenate((state_partial,[[psi]]),1)
+                state = np.concatenate((state_partial, psi_encoded, coin_dir_encoded),1)
                 # draw action
                 prob_u = self.pi_lo[o](state).numpy()
                 prob_u_rescaled = np.divide(prob_u,np.amin(prob_u)+0.01)
@@ -366,17 +405,27 @@ class Simulation_NN:
                 # given action, draw next state
                 if version == 'simplified':
                     state_plus1 = Simulation_NN.Transition_simplified(state_partial, u)
-                elif version =='full':
+                elif version =='complete':
                     state_plus1 = Simulation_NN.Transition(state_partial, u)
                     
                 state_plus1 = state_plus1.reshape(1,2)
                 x = np.append(x, state_plus1, 0)
                 u_tot = np.append(u_tot,u)
                 
-                # Update psi and reward
+                # Update psi and reward and closest coin direction
                 dist_from_coins = np.linalg.norm(coin_location-state_plus1,2,1)
                 l=0
                 psi = 0
+                
+                if np.min(dist_from_coins)<=0.8:
+                    index_min = np.argmin(dist_from_coins,0)
+                    closer_coin_position = coin_location[index_min,:]
+                    closer_coin_relative_position = np.array([closer_coin_position[0]-state_plus1[0,0],closer_coin_position[1]-state_plus1[0,1]])
+                    angle = np.arctan2(closer_coin_relative_position[1],closer_coin_relative_position[0])*180/np.pi
+                    coin_direction = Foraging.GetDirectionFromAngle(angle, version)  
+                else:
+                    coin_direction = 8   
+                
                 for p in range(len(dist_from_coins)):
                     if dist_from_coins[p]<=0.8:
                         psi = 1
@@ -386,12 +435,18 @@ class Simulation_NN:
                     else:
                         l=l+1
                     
-                psi_tot = np.append(psi_tot, psi)              
+                psi_tot = np.append(psi_tot, psi)   
+                coin_direction_tot = np.append(coin_direction_tot, coin_direction)  
+
+                psi_encoded = np.zeros((1,2))
+                psi_encoded[0,psi] = 1
+                coin_dir_encoded = np.zeros((1,9))
+                coin_dir_encoded[0,coin_direction]=1
                         
                 # Select Termination
                 # Termination
                 state_plus1_partial = x[k+1,:].reshape((1,2))
-                state_plus1 = np.concatenate((state_plus1_partial,[[psi]]),1)
+                state_plus1 = np.concatenate((state_plus1_partial, psi_encoded, coin_dir_encoded),1)
                 prob_b = self.pi_b[o](state_plus1).numpy()
                 prob_b_rescaled = np.divide(prob_b,np.amin(prob_b)+0.01)
                 for i in range(1,prob_b_rescaled.shape[1]):
@@ -424,10 +479,11 @@ class Simulation_NN:
             control[t]=u_tot
             Option[t]=o_tot
             Termination[t]=b_tot
-            psi_evolution[t] = psi_tot                
+            psi_evolution[t] = psi_tot    
+            closest_coin_direction[t] = coin_direction_tot            
             reward = np.append(reward,r)
 
-            return traj, control, Option, Termination, psi_evolution, reward
+            return traj, control, Option, Termination, psi_evolution, closest_coin_direction, reward
         
         
     def HierarchicalStochasticSampleTrajMDP_simple_param(self, max_epoch_per_traj, number_of_trajectories, initial_state, version = 'full'):
@@ -521,6 +577,7 @@ class Simulation_NN:
                     dist_from_coins = np.linalg.norm(coin_location-state_plus1,2,1)
                     l=0
                     psi = 0
+                        
                     for p in range(len(dist_from_coins)):
                         if dist_from_coins[p]<=0.8:
                             psi = 1

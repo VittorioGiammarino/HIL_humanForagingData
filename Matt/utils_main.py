@@ -20,7 +20,7 @@ def Show_DataSet(Folders, size_data, Rand_traj, action_space, coins):
 #     coins = 'distr_only' coins on the gaussians distributions
 #             'full_coins' all the coins in the original experiment
 # =============================================================================
-    TrainingSet = np.empty((0,3))
+    TrainingSet = np.empty((0,4))
     Labels = np.empty((0,1))
     Time = []
     Trajectories = []
@@ -28,8 +28,8 @@ def Show_DataSet(Folders, size_data, Rand_traj, action_space, coins):
     Reward = []
     for folder in Folders:
         for experiment in range(1,11):
-            Training_set_single_traj, Labels_single_traj, Time_single_traj, psi_single_traj, reward_single_traj = World.Foraging.ProcessData(folder, experiment, action_space, coins)
-            Training_set_single_traj_together = np.concatenate((0.1*Training_set_single_traj[0:-1,:], psi_single_traj[0:-1].reshape(len(psi_single_traj[0:-1]),1)),1)
+            Training_set_single_traj, Labels_single_traj, Time_single_traj, psi_single_traj, coin_direction_single_traj, reward_single_traj = World.Foraging.ProcessData(folder, experiment, action_space, coins)
+            Training_set_single_traj_together = np.concatenate((0.1*Training_set_single_traj[0:-1,:], psi_single_traj[0:-1].reshape(len(psi_single_traj[0:-1]),1), coin_direction_single_traj[0:-1].reshape(len(psi_single_traj[0:-1]),1)),1)
             TrainingSet = np.append(TrainingSet, Training_set_single_traj_together, 0)
             Labels = np.append(Labels, Labels_single_traj.reshape(len(Labels_single_traj),1), 0)
             Time.append(Time_single_traj)
@@ -64,21 +64,21 @@ def Show_DataSet(Folders, size_data, Rand_traj, action_space, coins):
     plt.show()  
     
     
-    sigma1 = 5
-    circle1 = ptch.Circle((60, 75), 2*sigma1, color='k',  fill=False)
-    sigma2 = 11
-    circle2 = ptch.Circle((-15, -50), 2*sigma2, color='k',  fill=False)
-    sigma3 = 18
-    circle3 = ptch.Circle((-50, 30), 2*sigma3, color='k',  fill=False)
-    sigma4 = 13
-    circle4 = ptch.Circle((49, -40), 2*sigma4, color='k',  fill=False)
+    sigma1 = 0.5
+    circle1 = ptch.Circle((6, 7.5), 2*sigma1, color='k',  fill=False)
+    sigma2 = 1.1
+    circle2 = ptch.Circle((-1.5, -5), 2*sigma2, color='k',  fill=False)
+    sigma3 = 1.8
+    circle3 = ptch.Circle((-5, 3), 2*sigma3, color='k',  fill=False)
+    sigma4 = 1.3
+    circle4 = ptch.Circle((4.9, -4), 2*sigma4, color='k',  fill=False)
     fig, ax = plt.subplots()
     ax.add_artist(circle1)
     ax.add_artist(circle2)
     ax.add_artist(circle3)
     ax.add_artist(circle4)
-    plot_data = plt.scatter(True_traj[0:size_data,0], True_traj[0:size_data,1], c=True_time[0:size_data], marker='o', cmap='cool') #-1], marker='o', cmap='cool')
-    plt.plot(coins_location[:,0], coins_location[:,1], 'xb')
+    plot_data = plt.scatter(0.1*True_traj[0:size_data,0], 0.1*True_traj[0:size_data,1], c=True_time[0:size_data], marker='o', cmap='cool') #-1], marker='o', cmap='cool')
+    plt.plot(0.1*coins_location[:,0], 0.1*coins_location[:,1], 'xb')
     cbar = fig.colorbar(plot_data, ticks=[10, 100, 200, 300, 400, 500])
     cbar.ax.set_yticklabels(['time = 0', 'time = 100', 'time = 200', 'time = 300', 'time = 400', 'time = 500'])
     plt.xlabel('x')

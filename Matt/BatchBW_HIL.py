@@ -41,13 +41,7 @@ class NN_PI_LO:
         model = keras.Sequential([             
                 keras.layers.Dense(40, activation='relu', input_shape=(self.size_input,),
                                    kernel_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5, seed=0),
-                                   bias_initializer=keras.initializers.Zeros()),       
-                keras.layers.Dense(20, activation='relu', input_shape=(self.size_input,),
-                                   kernel_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5, seed=0),
-                                   bias_initializer=keras.initializers.Zeros()),     
-                keras.layers.Dense(10, activation='relu', input_shape=(self.size_input,),
-                                   kernel_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5, seed=0),
-                                   bias_initializer=keras.initializers.Zeros()),                        
+                                   bias_initializer=keras.initializers.Zeros()),                             
                 keras.layers.Dense(self.action_space, kernel_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5, seed=1)),
                 keras.layers.Softmax()
                                  ])              
@@ -146,7 +140,7 @@ class NN_PI_HI:
     
     def PreTraining(self, TrainingSet):
         model = NN_PI_HI.NN_model(self)
-        Labels = TrainingSet[:,2]
+        Labels = TrainingSet[:,3]
         model.compile(optimizer='adam',
                       loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
                       metrics=['accuracy'])
@@ -157,7 +151,7 @@ class NN_PI_HI:
     
 
 class BatchHIL:
-    def __init__(self, TrainingSet, Labels, option_space, M_step_epoch, size_batch, optimizer, supervised_pi_hi):
+    def __init__(self, TrainingSet, Labels, option_space, M_step_epoch, size_batch, optimizer, supervised_pi_hi, NN_init = 'pre-train'):
         self.TrainingSet = TrainingSet
         self.Labels = Labels
         self.option_space = option_space
@@ -166,17 +160,25 @@ class BatchHIL:
         self.termination_space = 2
         self.zeta = 0.0001
         self.mu = np.ones(option_space)*np.divide(1,option_space)
-        pi_hi = NN_PI_HI(self.option_space, self.size_input)
-        pi_hi_model = pi_hi.PreTraining(self.TrainingSet)
-        self.NN_options = pi_hi_model
         
-        if option_space==2:
+        # pi_hi net init
+        pi_hi = NN_PI_HI(self.option_space, self.size_input)
+        if NN_init == 'pre-train':
+            pi_hi_model = pi_hi.PreTraining(self.TrainingSet)
+            self.NN_options = pi_hi_model
+        else:
+            NN_options = pi_hi.NN_model()
+            self.NN_options = NN_options
+            
+        # pi_lo and pi_b net init
+        if NN_init == 'pre-train' and option_space==2:
             NN_low = []
             NN_termination = []
             pi_lo = NN_PI_LO(self.action_space, self.size_input)
             for options in range(self.option_space):
                 NN_low.append(pi_lo.NN_model())
             self.NN_actions = NN_low
+            
             pi_b = NN_PI_B(self.termination_space, self.size_input)
             Labels_b1 = TrainingSet[:,2]
             pi_b_model1 = pi_b.PreTraining(TrainingSet, Labels_b1)
