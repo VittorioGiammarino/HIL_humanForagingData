@@ -151,7 +151,7 @@ class NN_PI_HI:
     
 
 class BatchHIL:
-    def __init__(self, TrainingSet, Labels, option_space, M_step_epoch, size_batch, optimizer, supervised_pi_hi, NN_init = 'pre-train'):
+    def __init__(self, TrainingSet, Labels, option_space, M_step_epoch, size_batch, optimizer, supervised_pi_hi, NN_init = 'pre-train', NN_options = None, NN_low = None, NN_termination = None):
         self.TrainingSet = TrainingSet
         self.Labels = Labels
         self.option_space = option_space
@@ -166,6 +166,8 @@ class BatchHIL:
         if NN_init == 'pre-train':
             pi_hi_model = pi_hi.PreTraining(self.TrainingSet)
             self.NN_options = pi_hi_model
+        elif NN_init == 'from_network':
+            self.NN_options = NN_options
         else:
             NN_options = pi_hi.NN_model()
             self.NN_options = NN_options
@@ -189,6 +191,9 @@ class BatchHIL:
             pi_b_model2 = pi_b.PreTraining(TrainingSet, Labels_b2)
             NN_termination.append(pi_b_model2)            
             self.NN_termination = NN_termination
+        elif NN_init == 'from_network':
+            self.NN_actions = NN_low
+            self.NN_termination = NN_termination  
         else:
             NN_low = []
             NN_termination = []

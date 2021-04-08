@@ -92,8 +92,10 @@ options_predictions = pi_hi_model.predict(T_set)
 
 
 
-# %% Training
+# %% Training single trajectory
 Likelihood_batch_list = []
+Rand_traj = 1
+size_data = len(Trajectories[Rand_traj])-1
 T_set = Trajectories[Rand_traj][0:size_data,:]
 # encode psi
 psi = T_set[:,2].reshape(len(T_set[:,2]),1)
@@ -112,20 +114,35 @@ optimizer = keras.optimizers.Adamax(learning_rate=1e-1)
 # Agent_BatchHIL = BatchBW_HIL.BatchHIL_param_simplified(T_set, Heading_set, M_step_epoch, size_batch, optimizer) 
 Agent_BatchHIL = BatchBW_HIL.BatchHIL(T_set, Heading_set, option_space, M_step_epoch, size_batch, optimizer, options_predictions)
 N=2 #number of iterations for the BW algorithm
-start_batch_time = time.time()
 pi_hi_batch, pi_lo_batch, pi_b_batch, likelihood = Agent_BatchHIL.Baum_Welch(N)
-end_batch_time = time.time()
-Batch_time = end_batch_time-start_batch_time
 Likelihood_batch_list.append(likelihood)
 
-# %%
-likelihood_temp = Agent_BatchHIL.likelihood_approximation()
+# for Rand_traj in range(1,len(Trajectories)):
+    
+#     size_data = len(Trajectories[Rand_traj])-1
+#     T_set = Trajectories[Rand_traj][0:size_data,:]
+#     # encode psi
+#     psi = T_set[:,2].reshape(len(T_set[:,2]),1)
+#     onehot_encoder = OneHotEncoder(sparse=False)
+#     onehot_encoded_psi = onehot_encoder.fit_transform(psi)
+#     # encode closest coin direction
+#     closest_coin_direction = T_set[:,3].reshape(len(T_set[:,3]),1)
+#     onehot_encoded_closest_coin_direction = onehot_encoder.fit_transform(closest_coin_direction)
+#     coordinates = T_set[:,0:2].reshape(len(T_set[:,0:2]),2)
+#     T_set = np.concatenate((coordinates,onehot_encoded_psi,onehot_encoded_closest_coin_direction),1)
+#     Heading_set = Rotation[Rand_traj][0:size_data]
+#     # Agent_BatchHIL = BatchBW_HIL.BatchHIL_param_simplified(T_set, Heading_set, M_step_epoch, size_batch, optimizer) 
+#     Agent_BatchHIL = BatchBW_HIL.BatchHIL(T_set, Heading_set, option_space, M_step_epoch, size_batch, optimizer, options_predictions, NN_init = 'from_network', NN_options = pi_hi_batch, NN_low = pi_lo_batch, NN_termination = pi_b_batch)
+#     N=2 #number of iterations for the BW algorithm
+#     pi_hi_batch, pi_lo_batch, pi_b_batch, likelihood = Agent_BatchHIL.Baum_Welch(N)
+#     Likelihood_batch_list.append(likelihood)
+    
 
 # %%evaluation
 coins_location = World.Foraging.CoinLocation(6, Rand_traj+1, 'full_coins')
 for traj in range(1):
     BatchSim = World.Simulation_NN(pi_hi_batch, pi_lo_batch, pi_b_batch)
-    [trajBatch, controlBatch, OptionsBatch, TerminationBatch, psiBatch, coin_directionBatch, rewardBatch] = BatchSim.HierarchicalStochasticSampleTrajMDP(3000, 1, np.array([7.5, -7.5]), Folders[0], Rand_traj)
+    [trajBatch, controlBatch, OptionsBatch, TerminationBatch, psiBatch, coin_directionBatch, rewardBatch] = BatchSim.HierarchicalStochasticSampleTrajMDP(3000, 1, np.array([5, 5]), Folders[0], Rand_traj)
 
     # Plot result
 
@@ -150,7 +167,7 @@ for traj in range(1):
     # plt.ylim([-10, 10])
     plt.xlabel('x')
     plt.ylabel('y')
-    plt.savefig('Figures/FiguresBatch/Traj_VS_Options_traj{}_new2.eps'.format(traj), format='eps')
+    plt.savefig('Figures/FiguresBatch/Traj_VS_Options_traj{}_new3.eps'.format(traj), format='eps')
     plt.show()  
 
     sigma1 = 0.5
@@ -174,7 +191,7 @@ for traj in range(1):
     # plt.ylim([-10, 10])
     plt.xlabel('x')
     plt.ylabel('y')
-    plt.savefig('Figures/FiguresBatch/Traj_VS_Time_traj{}_new2.eps'.format(traj), format='eps')
+    plt.savefig('Figures/FiguresBatch/Traj_VS_Time_traj{}_new3.eps'.format(traj), format='eps')
     plt.show()  
 
 
