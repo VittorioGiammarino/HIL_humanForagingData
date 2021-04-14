@@ -277,10 +277,13 @@ class Foraging:
     
     
     class env:
-        def __init__(self,  Folder, expert_traj, init_state = np.array([0,0,0,8]), version = 'complete'):
+        def __init__(self,  Folder, expert_traj, init_state = np.array([0,0,0,8]), version = 'complete', version_coins = 'full_coins'):
             self.state = init_state
             self.version = version
-            self.coin_location = Foraging.CoinLocation(Folder, expert_traj+1)
+            self.Folder = Folder
+            self.expert_traj = expert_traj
+            self.version_coins = version_coins
+            self.coin_location = Foraging.CoinLocation(Folder, expert_traj+1, self.version_coins)
             self.observation_size = len(self.state)
             if version == 'complete':
                 self.action_size = 8
@@ -292,10 +295,12 @@ class Foraging:
             init_state = np.array([0,0,0,8])
             if version == 'standard':
                 self.state = init_state
+                self.coin_location = Foraging.CoinLocation(self.Folder, self.expert_traj+1, self.version_coins)
             else:
                 state = np.random.randint(-100,100,2)
                 init_state = np.concatenate((state, np.array([0,8])))
                 self.state = init_state
+                self.coin_location = Foraging.CoinLocation(self.Folder, self.expert_traj+1, self.version_coins)
                 
             return self.state
                 
@@ -589,7 +594,7 @@ class Simulation_NN:
             closest_coin_direction[t] = coin_direction_tot            
             reward = np.append(reward,r)
 
-            return traj, control, Option, Termination, psi_evolution, closest_coin_direction, reward
+        return traj, control, Option, Termination, psi_evolution, closest_coin_direction, reward
         
         
     def HierarchicalStochasticSampleTrajMDP_simple_param(self, max_epoch_per_traj, number_of_trajectories, initial_state, version = 'full'):
@@ -737,6 +742,6 @@ class Simulation_NN:
                 psi_evolution[t] = psi_tot                
                 reward = np.append(reward,r)
     
-                return traj, control, Option, Termination, psi_evolution, reward      
+            return traj, control, Option, Termination, psi_evolution, reward      
     
             

@@ -18,12 +18,13 @@ from sklearn.preprocessing import OneHotEncoder
 # %% Preprocessing_data with psi based on the coins clusters distribution  
 Folders = [6] #[6, 7, 11, 12, 15]
 size_data = 3100
-Rand_traj = 4
+Rand_traj = 0
 
-TrainingSet, Labels, Trajectories, Rotation, Time, Reward = Show_DataSet(Folders, size_data, Rand_traj, 'complete', 'distr_only')
+TrainingSet, Labels, Trajectories, Rotation, Time, _ = Show_DataSet(Folders, size_data, Rand_traj, 'complete', 'distr_only', 'no plot')
 # _,_,_,_,_,_ = Show_DataSet(Folders, size_data, Rand_traj, 'simplified', 'distr_only')
-# _,_,_,_,_,_  = Show_DataSet(Folders, size_data, Rand_traj, 'complete', 'full_coins')
+_,_,_,_,_, Reward  = Show_DataSet(Folders, size_data, Rand_traj, 'complete', 'full_coins', 'no plot')
 # _,_,_,_,_,_  = Show_DataSet(Folders, size_data, Rand_traj, 'simplified', 'full_coins')
+
 
 
 # %% one-hot encoding

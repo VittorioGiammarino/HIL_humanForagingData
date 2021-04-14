@@ -128,12 +128,15 @@ class Q_learning_NN:
         gamma = 0.99 
         epsilon = 0.5
         reward_per_episode =[]
+        traj = [[None]*1 for _ in range(NEpisodes)]
         batch_size = 256
         Buffer = ReplayBuffer(10000, self.observation_space_size)
         
         for i_episode in range(NEpisodes):
+            x = np.empty((0, self.observation_space_size))
             current_state = self.env.reset('random')
             cum_reward = 0 
+            x = np.append(x, current_state.reshape(1, self.observation_space_size), 0)
             
             for t in range(3000):
                 # env.render()
@@ -149,6 +152,7 @@ class Q_learning_NN:
                 new_state = obs
                 Buffer.store_transition(current_state, action, reward, new_state)
                 current_state = new_state
+                x = np.append(x, current_state.reshape(1, self.observation_space_size), 0)
                 cum_reward = cum_reward + reward
                 
                 if Buffer.mem_cntr>batch_size:
@@ -166,6 +170,7 @@ class Q_learning_NN:
                     
             print("Episode reward {}".format(cum_reward))
             reward_per_episode.append(cum_reward)
+            traj[i_episode] = x
 
                 
             # end = time.time()
@@ -173,18 +178,18 @@ class Q_learning_NN:
             #     break
                 
         
-        mean = np.mean(reward_per_episode)
+        # mean = np.mean(reward_per_episode)
         
-        plt.figure()
-        plt.plot(np.linspace(1,i_episode+1,i_episode+1),reward_per_episode, 'g', label='Policy')
-        plt.plot(np.linspace(1,i_episode+1,i_episode+1), mean*np.ones(i_episode+1), 'k--', label='Mean')
-        plt.xlabel('Episode')
-        plt.ylabel('Steps lasted')
-        plt.legend()
-        plt.title('Training NN Q Learning')
-        plt.savefig('cartpole_Tain_NN_Qlearning.eps', format="eps")  
+        # plt.figure()
+        # plt.plot(np.linspace(1,i_episode+1,i_episode+1),reward_per_episode, 'g', label='Policy')
+        # plt.plot(np.linspace(1,i_episode+1,i_episode+1), mean*np.ones(i_episode+1), 'k--', label='Mean')
+        # plt.xlabel('Episode')
+        # plt.ylabel('Steps lasted')
+        # plt.legend()
+        # plt.title('Training NN Q Learning')
+        # plt.savefig('cartpole_Tain_NN_Qlearning.eps', format="eps")  
         
-        return reward_per_episode
+        return reward_per_episode, traj
 
     def Training_buffer_Double(self, NEpisodes):
         
@@ -308,7 +313,7 @@ class Q_learning_NN:
         return steps_per_episode
         
 
-NEpisodes = 5
+NEpisodes = 10
 Folders = 6 #[6, 7, 11, 12, 15]
 Rand_traj = 4
 
@@ -330,7 +335,7 @@ for seed in range(1):
     # NN_eval_list.append(agent_NN_Q_learning.Evaluation(NEpisodes))
     agent_NN_Q_learning_buffer = Q_learning_NN(seed, Folders, Rand_traj)
     NN_buffer_training_list.append(agent_NN_Q_learning_buffer.Training_buffer(NEpisodes))
-    NN_buffer_eval_list.append(agent_NN_Q_learning_buffer.Evaluation(NEpisodes))
+    # NN_buffer_eval_list.append(agent_NN_Q_learning_buffer.Evaluation(NEpisodes))
     # agent_NN_Double_Q_learning_buffer = Q_learning_NN(seed)
     # agent_NN_Double_Q_learning_buffer.Training_buffer_Double(NEpisodes)
     # agent_NN_Double_Q_learning_buffer.Evaluation(NEpisodes)
@@ -338,59 +343,59 @@ for seed in range(1):
 
 #%%
 
-rp = np.asarray(rp_list)
-tabular_training = np.asarray(tabular_training_list)
-tabular_eval = np.asarray(tabular_eval_list)
-NN_training = np.asarray(NN_training_list)
-NN_eval = np.asarray(NN_eval_list)
-NN_buffer_training = np.asarray(NN_buffer_training_list)
-NN_buffer_eval = np.asarray(NN_buffer_eval_list)
+# rp = np.asarray(rp_list)
+# tabular_training = np.asarray(tabular_training_list)
+# tabular_eval = np.asarray(tabular_eval_list)
+# NN_training = np.asarray(NN_training_list)
+# NN_eval = np.asarray(NN_eval_list)
+# NN_buffer_training = np.asarray(NN_buffer_training_list)
+# NN_buffer_eval = np.asarray(NN_buffer_eval_list)
 
 
-# Training
-ave_tab_train = np.mean(tabular_training,0)
-std_tab_train = np.std(tabular_training,0)
-ave_NN_train = np.mean(NN_training,0)
-std_NN_train = np.std(NN_training,0)
-ave_NN_buffer_train = np.mean(NN_buffer_training,0)
-std_NN_buffer_train = np.std(NN_buffer_training,0)
+# # Training
+# ave_tab_train = np.mean(tabular_training,0)
+# std_tab_train = np.std(tabular_training,0)
+# ave_NN_train = np.mean(NN_training,0)
+# std_NN_train = np.std(NN_training,0)
+# ave_NN_buffer_train = np.mean(NN_buffer_training,0)
+# std_NN_buffer_train = np.std(NN_buffer_training,0)
 
 
-fig, ax = plt.subplots()
-ax.plot(np.arange(len(ave_tab_train)), ave_tab_train, label='Tabular Q-learning', c='b')
-ax.fill_between(np.arange(len(ave_tab_train)), ave_tab_train-std_tab_train, ave_tab_train+std_tab_train, alpha=0.1, facecolor='b')
-ax.plot(np.arange(len(ave_NN_train)), ave_NN_train, label='Deep Q-learning', c='g')
-ax.fill_between(np.arange(len(ave_NN_train)), ave_NN_train-std_NN_train, ave_NN_train+std_NN_train, alpha=0.1, facecolor='g')
-ax.plot(np.arange(len(ave_NN_buffer_train)), ave_NN_buffer_train, label='Deep Q-learning w/ buffer', c='k')
-ax.fill_between(np.arange(len(ave_NN_buffer_train)), ave_NN_buffer_train-std_NN_buffer_train, ave_NN_buffer_train+std_NN_buffer_train, alpha=0.1, facecolor='k')
-ax.legend(facecolor = '#d8dcd6')
-ax.set_xlabel('Episodes')
-ax.set_ylabel('Average Reward')
-ax.set_title('Training')
-plt.savefig('Training_comparison.png', format='png')
+# fig, ax = plt.subplots()
+# ax.plot(np.arange(len(ave_tab_train)), ave_tab_train, label='Tabular Q-learning', c='b')
+# ax.fill_between(np.arange(len(ave_tab_train)), ave_tab_train-std_tab_train, ave_tab_train+std_tab_train, alpha=0.1, facecolor='b')
+# ax.plot(np.arange(len(ave_NN_train)), ave_NN_train, label='Deep Q-learning', c='g')
+# ax.fill_between(np.arange(len(ave_NN_train)), ave_NN_train-std_NN_train, ave_NN_train+std_NN_train, alpha=0.1, facecolor='g')
+# ax.plot(np.arange(len(ave_NN_buffer_train)), ave_NN_buffer_train, label='Deep Q-learning w/ buffer', c='k')
+# ax.fill_between(np.arange(len(ave_NN_buffer_train)), ave_NN_buffer_train-std_NN_buffer_train, ave_NN_buffer_train+std_NN_buffer_train, alpha=0.1, facecolor='k')
+# ax.legend(facecolor = '#d8dcd6')
+# ax.set_xlabel('Episodes')
+# ax.set_ylabel('Average Reward')
+# ax.set_title('Training')
+# plt.savefig('Training_comparison.png', format='png')
 
 
-# Evaluation
-ave_rp = np.mean(rp,0)
-std_rp = np.std(rp,0)
-ave_tabular_eval = np.mean(tabular_eval,0)
-std_tabular_eval = np.std(tabular_eval,0)
-ave_NN_eval = np.mean(NN_eval,0)
-std_NN_eval = np.std(NN_eval,0)
-ave_NN_buffer_eval = np.mean(NN_buffer_eval,0)
-std_NN_buffer_eval = np.std(NN_buffer_eval,0)
+# # Evaluation
+# ave_rp = np.mean(rp,0)
+# std_rp = np.std(rp,0)
+# ave_tabular_eval = np.mean(tabular_eval,0)
+# std_tabular_eval = np.std(tabular_eval,0)
+# ave_NN_eval = np.mean(NN_eval,0)
+# std_NN_eval = np.std(NN_eval,0)
+# ave_NN_buffer_eval = np.mean(NN_buffer_eval,0)
+# std_NN_buffer_eval = np.std(NN_buffer_eval,0)
 
-fig, ax = plt.subplots()
-ax.plot(np.arange(len(ave_rp)), ave_rp, label='random Policy', c='r')
-ax.fill_between(np.arange(len(ave_rp)), ave_rp-std_rp, ave_rp+std_rp, alpha=0.1, facecolor='r')
-ax.plot(np.arange(len(ave_tabular_eval)), ave_tabular_eval, label='Tabular Q-learning', c='b')
-ax.fill_between(np.arange(len(ave_tabular_eval)), ave_tabular_eval-std_tabular_eval, ave_tabular_eval+std_tabular_eval, alpha=0.1, facecolor='b')
-ax.plot(np.arange(len(ave_NN_eval)), ave_NN_eval, label='Deep Q-learning', c='g')
-ax.fill_between(np.arange(len(ave_NN_eval)), ave_NN_eval-std_NN_eval, ave_NN_eval+std_NN_eval, alpha=0.1, facecolor='g')
-ax.plot(np.arange(len(ave_NN_buffer_eval)), ave_NN_buffer_eval, label='Deep Q-learning w/ buffer', c='k')
-ax.fill_between(np.arange(len(ave_NN_buffer_eval)), ave_NN_buffer_eval-std_NN_buffer_eval, ave_NN_buffer_eval+std_NN_buffer_eval, alpha=0.1, facecolor='k')
-ax.legend(facecolor = '#d8dcd6')
-ax.set_xlabel('Episodes')
-ax.set_ylabel('Average Reward')
-ax.set_title('Evaluation')
-plt.savefig('Evaluation_comparison.png', format='png')
+# fig, ax = plt.subplots()
+# ax.plot(np.arange(len(ave_rp)), ave_rp, label='random Policy', c='r')
+# ax.fill_between(np.arange(len(ave_rp)), ave_rp-std_rp, ave_rp+std_rp, alpha=0.1, facecolor='r')
+# ax.plot(np.arange(len(ave_tabular_eval)), ave_tabular_eval, label='Tabular Q-learning', c='b')
+# ax.fill_between(np.arange(len(ave_tabular_eval)), ave_tabular_eval-std_tabular_eval, ave_tabular_eval+std_tabular_eval, alpha=0.1, facecolor='b')
+# ax.plot(np.arange(len(ave_NN_eval)), ave_NN_eval, label='Deep Q-learning', c='g')
+# ax.fill_between(np.arange(len(ave_NN_eval)), ave_NN_eval-std_NN_eval, ave_NN_eval+std_NN_eval, alpha=0.1, facecolor='g')
+# ax.plot(np.arange(len(ave_NN_buffer_eval)), ave_NN_buffer_eval, label='Deep Q-learning w/ buffer', c='k')
+# ax.fill_between(np.arange(len(ave_NN_buffer_eval)), ave_NN_buffer_eval-std_NN_buffer_eval, ave_NN_buffer_eval+std_NN_buffer_eval, alpha=0.1, facecolor='k')
+# ax.legend(facecolor = '#d8dcd6')
+# ax.set_xlabel('Episodes')
+# ax.set_ylabel('Average Reward')
+# ax.set_title('Evaluation')
+# plt.savefig('Evaluation_comparison.png', format='png')
