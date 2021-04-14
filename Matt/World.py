@@ -10,6 +10,9 @@ import numpy as np
 from sklearn.preprocessing import OneHotEncoder
 import csv
 
+
+
+
 class Foraging:    
 
     def TransitionCheck4Labels_simplified(state,state_next):
@@ -271,6 +274,109 @@ class Foraging:
             see_coin_array, coin_direction_array, reward = Foraging.GeneratePsi(Simulated_states, coin_location, version)            
             
         return Simulated_states, Labels, time_cleaned, see_coin_array, coin_direction_array, reward
+    
+    
+    class env:
+        def __init__(self,  Folder, expert_traj, init_state = np.array([0,0,0,8]), version = 'complete'):
+            self.state = init_state
+            self.version = version
+            self.coin_location = Foraging.CoinLocation(Folder, expert_traj+1)
+            self.observation_size = len(self.state)
+            if version == 'complete':
+                self.action_size = 8
+            elif version == 'simplified':
+                self.action_size = 4
+                
+            
+        def reset(self, version = 'standard'):
+            init_state = np.array([0,0,0,8])
+            if version == 'standard':
+                self.state = init_state
+            else:
+                state = np.random.randint(-100,100,2)
+                init_state = np.concatenate((state, np.array([0,8])))
+                self.state = init_state
+                
+            return self.state
+                
+        def Transition(state,action):
+            Transition = np.zeros((9,2))
+            Transition[0,0] = state[0] + 1
+            Transition[0,1] = state[1] + 0
+            Transition[1,0] = state[0] + 1
+            Transition[1,1] = state[1] + 1
+            Transition[2,0] = state[0] + 0
+            Transition[2,1] = state[1] + 1
+            Transition[3,0] = state[0] - 1
+            Transition[3,1] = state[1] + 1
+            Transition[4,0] = state[0] - 1
+            Transition[4,1] = state[1] + 0
+            Transition[5,0] = state[0] - 1
+            Transition[5,1] = state[1] - 1
+            Transition[6,0] = state[0] + 0
+            Transition[6,1] = state[1] - 1
+            Transition[7,0] = state[0] + 1
+            Transition[7,1] = state[1] - 1
+            Transition[8,:] = state
+            state_plus1 = Transition[int(action),:]
+            
+            return state_plus1     
+
+        def Transition_simplified(state,action):
+            Transition = np.zeros((5,2))
+            Transition[0,0] = state[0] + 1
+            Transition[0,1] = state[1] + 0
+            Transition[1,0] = state[0] + 0
+            Transition[1,1] = state[1] + 1
+            Transition[2,0] = state[0] - 1
+            Transition[2,1] = state[1] + 0
+            Transition[3,0] = state[0] + 0
+            Transition[3,1] = state[1] - 1
+            Transition[4,:] = state
+            state_plus1 = Transition[int(action),:]
+            
+            return state_plus1  
+    
+        def step(self, action):
+            
+            r=0
+            state_partial = self.state[0:2]
+            # given action, draw next state
+            if self.version == 'simplified':
+                state_plus1_partial = Foraging.env.Transition_simplified(state_partial, action)
+            elif self.version =='complete':
+                state_plus1_partial = Foraging.env.Transition(state_partial, action)
+                    
+                
+            # Update psi and reward and closest coin direction
+            dist_from_coins = np.linalg.norm(self.coin_location-state_plus1_partial,2,1)
+            l=0
+            psi = 0
+                
+            if np.min(dist_from_coins)<=8:
+                index_min = np.argmin(dist_from_coins,0)
+                closer_coin_position = self.coin_location[index_min,:]
+                closer_coin_relative_position = np.array([closer_coin_position[0]-state_plus1_partial[0],closer_coin_position[1]-state_plus1_partial[1]])
+                angle = np.arctan2(closer_coin_relative_position[1],closer_coin_relative_position[0])*180/np.pi
+                coin_direction = Foraging.GetDirectionFromAngle(angle, self.version)  
+            else:
+                coin_direction = 8   
+            
+            for p in range(len(dist_from_coins)):
+                if dist_from_coins[p]<=8:
+                    psi = 1
+                if dist_from_coins[p]<=3:
+                    self.coin_location = np.delete(self.coin_location, l, 0)
+                    r = r+1
+                else:
+                    l=l+1
+                    
+            state_plus1 = np.concatenate((state_plus1_partial, [psi], [coin_direction]))
+            self.state = state_plus1
+            
+            return state_plus1, r
+        
+        
     
     
 class Simulation_NN:
@@ -631,5 +737,6 @@ class Simulation_NN:
                 psi_evolution[t] = psi_tot                
                 reward = np.append(reward,r)
     
-                return traj, control, Option, Termination, psi_evolution, reward        
+                return traj, control, Option, Termination, psi_evolution, reward      
+    
             

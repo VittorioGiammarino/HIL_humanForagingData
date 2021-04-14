@@ -124,4 +124,4 @@ def Show_DataSet(Folders, size_data, Rand_traj, action_space, coins):
     plt.savefig('Figures/FiguresExpert/Expert_Traj_VS_View3D_traj{}_{}_{}.eps'.format(Rand_traj, action_space, coins), format='eps')
     plt.show()
     
-    return TrainingSet, Labels, Trajectories, Rotation, Time
+    return TrainingSet, Labels, Trajectories, Rotation, Time, Reward
