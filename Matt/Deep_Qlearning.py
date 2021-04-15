@@ -7,6 +7,7 @@ Created on Tue Apr 13 15:44:57 2021
 """
 
 import matplotlib.pyplot as plt
+import matplotlib.patches as ptch
 import numpy as np
 import tensorflow as tf 
 from tensorflow import keras
@@ -123,14 +124,14 @@ class Q_learning_NN:
         return reward_per_episode
     
     
-    def Training_buffer(self, NEpisodes):
+    def Training_buffer(self, NEpisodes, seed):
         
         gamma = 0.99 
         epsilon = 0.5
         reward_per_episode =[]
         traj = [[None]*1 for _ in range(NEpisodes)]
         batch_size = 256
-        Buffer = ReplayBuffer(10000, self.observation_space_size)
+        Buffer = ReplayBuffer(30000, self.observation_space_size)
         
         for i_episode in range(NEpisodes):
             x = np.empty((0, self.observation_space_size))
@@ -168,29 +169,13 @@ class Q_learning_NN:
                                 
                                 
                     
-            print("Episode reward {}".format(cum_reward))
+            print("Episode {}: cumulative reward = {} (seed = {})".format(i_episode, cum_reward, seed))
             reward_per_episode.append(cum_reward)
             traj[i_episode] = x
-
-                
-            # end = time.time()
-            # if end-start > maxTime:
-            #     break
-                
-        
-        # mean = np.mean(reward_per_episode)
-        
-        # plt.figure()
-        # plt.plot(np.linspace(1,i_episode+1,i_episode+1),reward_per_episode, 'g', label='Policy')
-        # plt.plot(np.linspace(1,i_episode+1,i_episode+1), mean*np.ones(i_episode+1), 'k--', label='Mean')
-        # plt.xlabel('Episode')
-        # plt.ylabel('Steps lasted')
-        # plt.legend()
-        # plt.title('Training NN Q Learning')
-        # plt.savefig('cartpole_Tain_NN_Qlearning.eps', format="eps")  
-        
-        return reward_per_episode, traj
-
+            
+        network_weights = self.Q_network.get_weights()
+        return reward_per_episode, traj, network_weights 
+    
     def Training_buffer_Double(self, NEpisodes):
         
         gamma = 0.99 
@@ -214,7 +199,7 @@ class Q_learning_NN:
             current_state = self.env.reset()
             cum_reward = 0
             
-            for t in range(3000):
+            for t in range(500):
                 # env.render()
                 action = np.argmax(self.Q_network(current_state.reshape(1,len(current_state))))
                 b = np.argmax(Double_Q_net(current_state.reshape(1,len(current_state))))
@@ -313,89 +298,43 @@ class Q_learning_NN:
         return steps_per_episode
         
 
-NEpisodes = 10
+NEpisodes = 20
 Folders = 6 #[6, 7, 11, 12, 15]
 Rand_traj = 4
+seed = 0
 
-rp_list = []
-tabular_training_list = []
-tabular_eval_list = []
-NN_training_list = []
-NN_eval_list = []
-NN_buffer_training_list = []
-NN_buffer_eval_list = []
+agent_NN_Q_learning_buffer = Q_learning_NN(seed, Folders, Rand_traj)
+reward_per_episode, traj, network_weights = agent_NN_Q_learning_buffer.Training_buffer(NEpisodes, seed)
 
-for seed in range(1):
-    # rp_list.append(random_policy(seed, NEpisodes))
-    # agent_Q_learning_tabular = Q_learning_tabular(seed)
-    # tabular_training_list.append(agent_Q_learning_tabular.Training(NEpisodes))
-    # tabular_eval_list.append(agent_Q_learning_tabular.Evaluation(NEpisodes))
-    # agent_NN_Q_learning = Q_learning_NN(seed)
-    # NN_training_list.append(agent_NN_Q_learning.Training(NEpisodes))
-    # NN_eval_list.append(agent_NN_Q_learning.Evaluation(NEpisodes))
-    agent_NN_Q_learning_buffer = Q_learning_NN(seed, Folders, Rand_traj)
-    NN_buffer_training_list.append(agent_NN_Q_learning_buffer.Training_buffer(NEpisodes))
-    # NN_buffer_eval_list.append(agent_NN_Q_learning_buffer.Evaluation(NEpisodes))
-    # agent_NN_Double_Q_learning_buffer = Q_learning_NN(seed)
-    # agent_NN_Double_Q_learning_buffer.Training_buffer_Double(NEpisodes)
-    # agent_NN_Double_Q_learning_buffer.Evaluation(NEpisodes)
 
 
 #%%
 
-# rp = np.asarray(rp_list)
-# tabular_training = np.asarray(tabular_training_list)
-# tabular_eval = np.asarray(tabular_eval_list)
-# NN_training = np.asarray(NN_training_list)
-# NN_eval = np.asarray(NN_eval_list)
-# NN_buffer_training = np.asarray(NN_buffer_training_list)
-# NN_buffer_eval = np.asarray(NN_buffer_eval_list)
 
+coins_location = World.Foraging.CoinLocation(Folders, Rand_traj+1, 'full_coins') #np.random.randint(0,len(Time))
 
-# # Training
-# ave_tab_train = np.mean(tabular_training,0)
-# std_tab_train = np.std(tabular_training,0)
-# ave_NN_train = np.mean(NN_training,0)
-# std_NN_train = np.std(NN_training,0)
-# ave_NN_buffer_train = np.mean(NN_buffer_training,0)
-# std_NN_buffer_train = np.std(NN_buffer_training,0)
-
-
-# fig, ax = plt.subplots()
-# ax.plot(np.arange(len(ave_tab_train)), ave_tab_train, label='Tabular Q-learning', c='b')
-# ax.fill_between(np.arange(len(ave_tab_train)), ave_tab_train-std_tab_train, ave_tab_train+std_tab_train, alpha=0.1, facecolor='b')
-# ax.plot(np.arange(len(ave_NN_train)), ave_NN_train, label='Deep Q-learning', c='g')
-# ax.fill_between(np.arange(len(ave_NN_train)), ave_NN_train-std_NN_train, ave_NN_train+std_NN_train, alpha=0.1, facecolor='g')
-# ax.plot(np.arange(len(ave_NN_buffer_train)), ave_NN_buffer_train, label='Deep Q-learning w/ buffer', c='k')
-# ax.fill_between(np.arange(len(ave_NN_buffer_train)), ave_NN_buffer_train-std_NN_buffer_train, ave_NN_buffer_train+std_NN_buffer_train, alpha=0.1, facecolor='k')
-# ax.legend(facecolor = '#d8dcd6')
-# ax.set_xlabel('Episodes')
-# ax.set_ylabel('Average Reward')
-# ax.set_title('Training')
-# plt.savefig('Training_comparison.png', format='png')
-
-
-# # Evaluation
-# ave_rp = np.mean(rp,0)
-# std_rp = np.std(rp,0)
-# ave_tabular_eval = np.mean(tabular_eval,0)
-# std_tabular_eval = np.std(tabular_eval,0)
-# ave_NN_eval = np.mean(NN_eval,0)
-# std_NN_eval = np.std(NN_eval,0)
-# ave_NN_buffer_eval = np.mean(NN_buffer_eval,0)
-# std_NN_buffer_eval = np.std(NN_buffer_eval,0)
-
-# fig, ax = plt.subplots()
-# ax.plot(np.arange(len(ave_rp)), ave_rp, label='random Policy', c='r')
-# ax.fill_between(np.arange(len(ave_rp)), ave_rp-std_rp, ave_rp+std_rp, alpha=0.1, facecolor='r')
-# ax.plot(np.arange(len(ave_tabular_eval)), ave_tabular_eval, label='Tabular Q-learning', c='b')
-# ax.fill_between(np.arange(len(ave_tabular_eval)), ave_tabular_eval-std_tabular_eval, ave_tabular_eval+std_tabular_eval, alpha=0.1, facecolor='b')
-# ax.plot(np.arange(len(ave_NN_eval)), ave_NN_eval, label='Deep Q-learning', c='g')
-# ax.fill_between(np.arange(len(ave_NN_eval)), ave_NN_eval-std_NN_eval, ave_NN_eval+std_NN_eval, alpha=0.1, facecolor='g')
-# ax.plot(np.arange(len(ave_NN_buffer_eval)), ave_NN_buffer_eval, label='Deep Q-learning w/ buffer', c='k')
-# ax.fill_between(np.arange(len(ave_NN_buffer_eval)), ave_NN_buffer_eval-std_NN_buffer_eval, ave_NN_buffer_eval+std_NN_buffer_eval, alpha=0.1, facecolor='k')
-# ax.legend(facecolor = '#d8dcd6')
-# ax.set_xlabel('Episodes')
-# ax.set_ylabel('Average Reward')
-# ax.set_title('Evaluation')
-# plt.savefig('Evaluation_comparison.png', format='png')
+n_episode = 9   
+time = np.linspace(0,500,3001)  
+ 
+sigma1 = 0.5
+circle1 = ptch.Circle((6, 7.5), 2*sigma1, color='k',  fill=False)
+sigma2 = 1.1
+circle2 = ptch.Circle((-1.5, -5.0), 2*sigma2, color='k',  fill=False)
+sigma3 = 1.8
+circle3 = ptch.Circle((-5.0, 3.0), 2*sigma3, color='k',  fill=False)
+sigma4 = 1.3
+circle4 = ptch.Circle((4.9, -4.0), 2*sigma4, color='k',  fill=False)
+fig, ax = plt.subplots()
+ax.add_artist(circle1)
+ax.add_artist(circle2)
+ax.add_artist(circle3)
+ax.add_artist(circle4)
+plot_data = plt.scatter(traj[19][:,0], traj[19][:,1], c=time, marker='o', cmap='cool') #-1], marker='o', cmap='cool')
+plt.plot(0.1*coins_location[:,0], 0.1*coins_location[:,1], 'xb')
+cbar = fig.colorbar(plot_data, ticks=[10, 100, 200, 300, 400, 500])
+cbar.ax.set_yticklabels(['time = 0', 'time = 100', 'time = 200', 'time = 300', 'time = 400', 'time = 500'])
+plt.xlabel('x')
+plt.ylabel('y')
+plt.title('DQN trial')
+plt.savefig('Figures/FiguresDQN/simple_trial.eps', format='eps')
+plt.show()      

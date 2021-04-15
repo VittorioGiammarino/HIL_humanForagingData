@@ -283,7 +283,7 @@ class Foraging:
             self.Folder = Folder
             self.expert_traj = expert_traj
             self.version_coins = version_coins
-            self.coin_location = Foraging.CoinLocation(Folder, expert_traj+1, self.version_coins)
+            self.coin_location = 0.1*Foraging.CoinLocation(Folder, expert_traj+1, self.version_coins)
             self.observation_size = len(self.state)
             if version == 'complete':
                 self.action_size = 8
@@ -295,33 +295,33 @@ class Foraging:
             init_state = np.array([0,0,0,8])
             if version == 'standard':
                 self.state = init_state
-                self.coin_location = Foraging.CoinLocation(self.Folder, self.expert_traj+1, self.version_coins)
+                self.coin_location = 0.1*Foraging.CoinLocation(self.Folder, self.expert_traj+1, self.version_coins)
             else:
-                state = np.random.randint(-100,100,2)
+                state = 0.1*np.random.randint(-100,100,2)
                 init_state = np.concatenate((state, np.array([0,8])))
                 self.state = init_state
-                self.coin_location = Foraging.CoinLocation(self.Folder, self.expert_traj+1, self.version_coins)
+                self.coin_location = 0.1*Foraging.CoinLocation(self.Folder, self.expert_traj+1, self.version_coins)
                 
             return self.state
                 
         def Transition(state,action):
             Transition = np.zeros((9,2))
-            Transition[0,0] = state[0] + 1
+            Transition[0,0] = state[0] + 0.1
             Transition[0,1] = state[1] + 0
-            Transition[1,0] = state[0] + 1
-            Transition[1,1] = state[1] + 1
+            Transition[1,0] = state[0] + 0.1
+            Transition[1,1] = state[1] + 0.1
             Transition[2,0] = state[0] + 0
-            Transition[2,1] = state[1] + 1
-            Transition[3,0] = state[0] - 1
-            Transition[3,1] = state[1] + 1
-            Transition[4,0] = state[0] - 1
+            Transition[2,1] = state[1] + 0.1
+            Transition[3,0] = state[0] - 0.1
+            Transition[3,1] = state[1] + 0.1
+            Transition[4,0] = state[0] - 0.1
             Transition[4,1] = state[1] + 0
-            Transition[5,0] = state[0] - 1
-            Transition[5,1] = state[1] - 1
+            Transition[5,0] = state[0] - 0.1
+            Transition[5,1] = state[1] - 0.1
             Transition[6,0] = state[0] + 0
-            Transition[6,1] = state[1] - 1
-            Transition[7,0] = state[0] + 1
-            Transition[7,1] = state[1] - 1
+            Transition[6,1] = state[1] - 0.1
+            Transition[7,0] = state[0] + 0.1
+            Transition[7,1] = state[1] - 0.1
             Transition[8,:] = state
             state_plus1 = Transition[int(action),:]
             
@@ -329,14 +329,14 @@ class Foraging:
 
         def Transition_simplified(state,action):
             Transition = np.zeros((5,2))
-            Transition[0,0] = state[0] + 1
+            Transition[0,0] = state[0] + 0.1
             Transition[0,1] = state[1] + 0
             Transition[1,0] = state[0] + 0
-            Transition[1,1] = state[1] + 1
-            Transition[2,0] = state[0] - 1
+            Transition[1,1] = state[1] + 0.1
+            Transition[2,0] = state[0] - 0.1
             Transition[2,1] = state[1] + 0
             Transition[3,0] = state[0] + 0
-            Transition[3,1] = state[1] - 1
+            Transition[3,1] = state[1] - 0.1
             Transition[4,:] = state
             state_plus1 = Transition[int(action),:]
             
@@ -351,8 +351,13 @@ class Foraging:
                 state_plus1_partial = Foraging.env.Transition_simplified(state_partial, action)
             elif self.version =='complete':
                 state_plus1_partial = Foraging.env.Transition(state_partial, action)
-                    
                 
+            if state_plus1_partial[0]>10 or state_plus1_partial[0]<-10:
+                state_plus1_partial[0] = state_partial[0] 
+
+            if state_plus1_partial[1]>10 or state_plus1_partial[1]<-10:
+                state_plus1_partial[1] = state_partial[1]                 
+                    
             # Update psi and reward and closest coin direction
             dist_from_coins = np.linalg.norm(self.coin_location-state_plus1_partial,2,1)
             l=0
@@ -368,9 +373,9 @@ class Foraging:
                 coin_direction = 8   
             
             for p in range(len(dist_from_coins)):
-                if dist_from_coins[p]<=8:
+                if dist_from_coins[p]<=0.8:
                     psi = 1
-                if dist_from_coins[p]<=3:
+                if dist_from_coins[p]<=0.3:
                     self.coin_location = np.delete(self.coin_location, l, 0)
                     r = r+1
                 else:

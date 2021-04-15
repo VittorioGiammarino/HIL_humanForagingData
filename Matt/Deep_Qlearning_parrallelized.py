@@ -136,3 +136,7 @@ args = [(seed, Folders, Rand_traj, NEpisodes) for seed in range(Nprocesses)]
 Q_learning_results = pool.starmap(train, args) 
 pool.close()
 pool.join()
+
+# %%
+with open('Q_learning_results.npy', 'wb') as f:
+    np.save(f, Q_learning_results)
