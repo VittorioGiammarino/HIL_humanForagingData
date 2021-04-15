@@ -138,5 +138,5 @@ pool.close()
 pool.join()
 
 # %%
-with open('Q_learning_results.npy', 'wb') as f:
+with open('4_walls_coins_task/Q_learning_results.npy', 'wb') as f:
     np.save(f, Q_learning_results)
