@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Tue Apr 13 20:47:52 2021
+Created on Fri Apr 16 19:35:49 2021
 
 @author: vittorio
 """
+
 
 import World 
 import numpy as np
@@ -60,12 +61,15 @@ class ReplayBuffer():
         
         
         
-class Q_learning_NN:
+class Q_learning_NN_encoded:
     def __init__(self, seed, Folder, expert_traj, import_net=False, weights = 0):
         self.env = World.Foraging.env(Folder, expert_traj)
         np.random.seed(seed)
-        self.observation_space_size = self.env.observation_size
-        self.Q_network = Q_learning_NN.NN_model(self)
+        self.coordinates = 2
+        self.view = 2
+        self.closest_coin_dir = 9
+        self.observation_space_size = self.coordinates + self.view + self.closest_coin_dir # first 2 are fore coordinates, second 2 for view, and 9 for closest coin direction
+        self.Q_network = Q_learning_NN_encoded.NN_model(self)
         if import_net:
             self.Q_network.set_weights(weights)
 
@@ -73,7 +77,7 @@ class Q_learning_NN:
         model = keras.Sequential([             
                 keras.layers.Dense(256, activation='relu', input_shape=(self.observation_space_size,),
                                    kernel_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5, seed=0),
-                                   bias_initializer=keras.initializers.Zeros()),                                   
+                                   bias_initializer=keras.initializers.Zeros()),                                
                 keras.layers.Dense(self.env.action_size, kernel_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5, seed=2))
                                  ])              
         
@@ -93,22 +97,24 @@ class Q_learning_NN:
         network_weights = [[None]*1 for _ in range(NEpisodes)]
         batch_size = 256
         Buffer = ReplayBuffer(30000, self.observation_space_size)
-        count = 0
         
         for i_episode in range(NEpisodes):
             x = np.empty((0, self.observation_space_size))
             current_state = self.env.reset(reset, initial_state)
+            coordinates = current_state[0:2]
+            psi = current_state[2]
+            psi_encoded = np.zeros(self.view)
+            psi_encoded[int(psi)]=1
+            coin_dir_encoded = np.zeros(self.closest_coin_dir)
+            coin_dir = current_state[3]
+            coin_dir_encoded[int(coin_dir)]=1
+            current_state_encoded = np.concatenate((coordinates,psi_encoded,coin_dir_encoded))
             cum_reward = 0 
-            x = np.append(x, current_state.reshape(1, self.observation_space_size), 0)
-            
-            if np.mod(i_episode,10)==0:
-                count = count+1
-            
-            epsilon = max(0.5*(1/count),0.1)
+            x = np.append(x, current_state_encoded.reshape(1, self.observation_space_size), 0)
             
             for t in range(3000):
                 # env.render()
-                action = np.argmax(self.Q_network(current_state.reshape(1,len(current_state))))
+                action = np.argmax(self.Q_network(current_state_encoded.reshape(1,self.observation_space_size)))
                 
                 if np.mod(t,50)==0:
                     epsilon = epsilon/2
@@ -118,9 +124,17 @@ class Q_learning_NN:
                 
                 obs, reward = self.env.step(action)
                 new_state = obs
-                Buffer.store_transition(current_state, action, reward, new_state)
-                current_state = new_state
-                x = np.append(x, current_state.reshape(1, self.observation_space_size), 0)
+                coordinates = new_state[0:2]
+                psi = new_state[2]
+                psi_encoded = np.zeros(self.view)
+                psi_encoded[int(psi)]=1
+                coin_dir_encoded = np.zeros(self.closest_coin_dir)
+                coin_dir = new_state[3]
+                coin_dir_encoded[int(coin_dir)]=1
+                new_state_encoded = np.concatenate((coordinates,psi_encoded,coin_dir_encoded))
+                Buffer.store_transition(current_state_encoded, action, reward, new_state_encoded)
+                current_state_encoded = new_state_encoded
+                x = np.append(x, current_state_encoded.reshape(1, self.observation_space_size), 0)
                 cum_reward = cum_reward + reward
                 
                 if Buffer.mem_cntr>batch_size:
@@ -144,8 +158,8 @@ class Q_learning_NN:
         return reward_per_episode, traj, network_weights 
     
 
-def train(seed, Folders, Rand_traj, NEpisodes, reset, initial_state):
-    agent_NN_Q_learning_buffer = Q_learning_NN(seed, Folders, Rand_traj)
+def Train(seed, Folders, Rand_traj, NEpisodes, reset, initial_state):
+    agent_NN_Q_learning_buffer = Q_learning_NN_encoded(seed, Folders, Rand_traj)
     reward_per_episode, traj, network_weights = agent_NN_Q_learning_buffer.Training_buffer(NEpisodes, seed, reset, initial_state)
     
     return reward_per_episode, traj, network_weights
@@ -155,16 +169,17 @@ def train(seed, Folders, Rand_traj, NEpisodes, reset, initial_state):
 NEpisodes = 200
 Folders = 6 #[6, 7, 11, 12, 15]
 Rand_traj = 2
-
 reset = 'standard'
 initial_state = np.array([0, -2.6, 0, 8])
+
+# reward_per_episode, traj, network_weights = train(0, Folders, Rand_traj, NEpisodes, reset, initial_state)
 Ncpu = 40
 pool = MyPool(Ncpu)
 args = [(seed, Folders, Rand_traj, NEpisodes, reset, initial_state) for seed in range(Ncpu)]
-Q_learning_results = pool.starmap(train, args) 
+Q_learning_results_encoded = pool.starmap(Train, args) 
 pool.close()
 pool.join()
 
 # %%
-with open('4_walls_coins_task/Q_learning_results_deeper.npy', 'wb') as f:
-    np.save(f, Q_learning_results)
+with open('4_walls_coins_task/Q_learning_results_encoded.npy', 'wb') as f:
+    np.save(f, Q_learning_results_encoded)

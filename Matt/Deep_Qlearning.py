@@ -45,11 +45,13 @@ class ReplayBuffer():
         
         
 class Q_learning_NN:
-    def __init__(self, seed, Folder, expert_traj):
+    def __init__(self, seed, Folder, expert_traj, import_net=False, weights = 0):
         self.env = World.Foraging.env(Folder, expert_traj)
         np.random.seed(seed)
         self.observation_space_size = self.env.observation_size
         self.Q_network = Q_learning_NN.NN_model(self)
+        if import_net:
+            self.Q_network.set_weights(weights)
 
     def NN_model(self):
         model = keras.Sequential([             
@@ -124,18 +126,19 @@ class Q_learning_NN:
         return reward_per_episode
     
     
-    def Training_buffer(self, NEpisodes, seed):
+    def Training_buffer(self, NEpisodes, seed, reset = 'random', initial_state = np.array([0,0,0,8])):
         
         gamma = 0.99 
         epsilon = 0.5
         reward_per_episode =[]
         traj = [[None]*1 for _ in range(NEpisodes)]
+        network_weights = [[None]*1 for _ in range(NEpisodes)]
         batch_size = 256
         Buffer = ReplayBuffer(30000, self.observation_space_size)
         
         for i_episode in range(NEpisodes):
             x = np.empty((0, self.observation_space_size))
-            current_state = self.env.reset('random')
+            current_state = self.env.reset(reset, initial_state)
             cum_reward = 0 
             x = np.append(x, current_state.reshape(1, self.observation_space_size), 0)
             
@@ -172,169 +175,149 @@ class Q_learning_NN:
             print("Episode {}: cumulative reward = {} (seed = {})".format(i_episode, cum_reward, seed))
             reward_per_episode.append(cum_reward)
             traj[i_episode] = x
+            network_weights[i_episode] = self.Q_network.get_weights()
             
-        network_weights = self.Q_network.get_weights()
         return reward_per_episode, traj, network_weights 
     
-    def Training_buffer_Double(self, NEpisodes):
+    def Training_buffer_Double(self, NEpisodes, seed, reset = 'random', initial_state = np.array([0,0,0,8])):
         
         gamma = 0.99 
         epsilon = 0.5
         reward_per_episode =[]
+        traj = [[None]*1 for _ in range(NEpisodes)]
+        network_weights = [[None]*1 for _ in range(NEpisodes)]
         batch_size = 256
-        Buffer = ReplayBuffer(10000, self.observation_space_size)
+        Buffer = ReplayBuffer(50000, self.observation_space_size)
         
-        Double_Q_net = keras.Sequential([             
+        Target_Q_net = keras.Sequential([             
             keras.layers.Dense(256, activation='relu', input_shape=(self.observation_space_size,),
                                kernel_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5, seed=5),
                                bias_initializer=keras.initializers.Zeros()),                                
-            keras.layers.Dense(self.env.action_space.n, kernel_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5, seed=6))
+            keras.layers.Dense(self.env.action_size, kernel_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5, seed=6))
                                  ])              
         
-        Double_Q_net.compile(optimizer='adam',
-                             loss=tf.keras.losses.MeanSquaredError(),
-                             metrics=['accuracy'])
+        Target_Q_net.set_weights(self.Q_network.get_weights())
         
         for i_episode in range(NEpisodes):
-            current_state = self.env.reset()
-            cum_reward = 0
+            x = np.empty((0, self.observation_space_size))
+            current_state = self.env.reset(reset, initial_state)
+            cum_reward = 0 
+            x = np.append(x, current_state.reshape(1, self.observation_space_size), 0)
             
-            for t in range(500):
+            for t in range(3000):
                 # env.render()
                 action = np.argmax(self.Q_network(current_state.reshape(1,len(current_state))))
-                b = np.argmax(Double_Q_net(current_state.reshape(1,len(current_state))))
                 
                 if np.mod(t,50)==0:
                     epsilon = epsilon/2
             
                 if np.random.random() <= epsilon: 
                     action = np.random.randint(0,self.env.action_size)       
-                    
-                if np.random.random() <= epsilon: 
-                    b = np.random.randint(0,self.env.action_size)    
+                     
                 
                 obs, reward = self.env.step(action)
                 new_state = obs
                 Buffer.store_transition(current_state, action, reward, new_state)
                 current_state = new_state
+                x = np.append(x, current_state.reshape(1, self.observation_space_size), 0)
                 cum_reward = cum_reward + reward
                 
                 if Buffer.mem_cntr>batch_size:
                     state, action, reward, new_state = Buffer.sample_buffer(batch_size)
+                                                        
+                    future_optimal_value = np.max(Target_Q_net(new_state),1)
+                    learned_value = reward + gamma*future_optimal_value 
+            
+                    y = self.Q_network(state).numpy()
+                    y[np.arange(batch_size),action] = learned_value[np.arange(batch_size)]
+            
+                    self.Q_network.fit(state, y, epochs=1, verbose = 0)
                     
-                    if np.random.random()<=0.5:
-                
-                        future_optimal_value = np.max(Double_Q_net(new_state),1)
-                        learned_value = reward + gamma*future_optimal_value 
-                
-                        y = self.Q_network(state).numpy()
-                        y[np.arange(batch_size),action] = learned_value[np.arange(batch_size)]
-                
-                        self.Q_network.fit(state, y, epochs=1, verbose = 0)
-                        
-                    else:
-                        future_optimal_value = np.max(self.Q_network(new_state),1)
-                        learned_value = reward + gamma*future_optimal_value
-                        y = Double_Q_net(state).numpy()
-                        y[np.arange(batch_size),action] = learned_value[np.arange(batch_size)]
-                
-                        Double_Q_net.fit(state, y, epochs=1, verbose = 0)                        
-                                
-                  
+                    if np.mod(t,250)==0:
+                        Target_Q_net.set_weights(self.Q_network.get_weights())
+  
 
-            print("Episode reward {}".format(cum_reward))
+            print("Episode {}: cumulative reward = {} (seed = {})".format(i_episode, cum_reward, seed))
+            network_weights[i_episode] = self.Q_network.get_weights()
             reward_per_episode.append(cum_reward)
+            traj[i_episode] = x
 
-                
-            # end = time.time()
-            # if end-start > maxTime:
-            #     break
-                
         
-        mean = np.mean(reward_per_episode)
+        return reward_per_episode, traj, network_weights 
         
-        plt.figure()
-        plt.plot(np.linspace(1,i_episode+1,i_episode+1),reward_per_episode, 'g', label='Policy')
-        plt.plot(np.linspace(1,i_episode+1,i_episode+1), mean*np.ones(i_episode+1), 'k--', label='Mean')
-        plt.xlabel('Episode')
-        plt.ylabel('Steps lasted')
-        plt.legend()
-        plt.title('Training NN Q Learning')
-        plt.savefig('cartpole_Tain_NN_Qlearning.eps', format="eps")  
-        
-        return reward_per_episode
-        
-    def Evaluation(self, NEpisodes):
+    def Evaluation(self, NEpisodes, initial_state, seed):
 
-        steps_per_episode =[]
+        reward_per_episode =[]
+        traj = [[None]*1 for _ in range(NEpisodes)]
+        control = [[None]*1 for _ in range(NEpisodes)]
+        np.random.seed(seed)
+        
 
         for i_episode in range(NEpisodes):
-            current_state = self.env.reset()
+            x = np.empty((0, self.observation_space_size))
+            u = np.empty((0, 1))
+            current_state = self.env.reset('standard', init_state=initial_state)
+            cum_reward = 0 
+            x = np.append(x, current_state.reshape(1, self.observation_space_size), 0)
             
-            for t in range(5000):
+            for t in range(3000):
                 # env.render()
-                action = np.argmax(self.Q_network(current_state.reshape(1,len(current_state))))
-                   
-                obs, reward, done, _ = self.env.step(action)
-                current_state = obs
-                    
-                if done:
-                    print("Episode finished after {} timesteps".format(t+1))
-                    steps_per_episode.append(t+1)
-                    break
+                mean = np.argmax(self.Q_network(current_state.reshape(1,len(current_state))))
                 
+                action = int(np.random.normal(mean, 1.5, 1))%(self.env.action_size-1)
+                                   
+                obs, reward = self.env.step(action)
+                current_state = obs
+                x = np.append(x, current_state.reshape(1, self.observation_space_size), 0)
+                u = np.append(u, [[action]], 0)
+                cum_reward = cum_reward + reward
+                                    
+            print("Episode {}: cumulative reward = {}".format(i_episode, cum_reward))
+            reward_per_episode.append(cum_reward)
+            traj[i_episode] = x    
+            control[i_episode] = u
+
         
-        mean = np.mean(steps_per_episode)
-        
-        plt.figure()
-        plt.plot(np.linspace(1,NEpisodes,NEpisodes),steps_per_episode, 'g', label='Policy')
-        plt.plot(np.linspace(1,NEpisodes,NEpisodes), mean*np.ones(NEpisodes), 'k--', label='Mean')
-        plt.xlabel('Episode')
-        plt.ylabel('Steps lasted')
-        plt.legend()
-        plt.title('Evaluation NN Q Learning')
-        plt.savefig('cartpole_Eval_NN_Qlearning.eps', format="eps")  
-        
-        return steps_per_episode
+        return  reward_per_episode, traj, control
         
 
-NEpisodes = 20
-Folders = 6 #[6, 7, 11, 12, 15]
-Rand_traj = 4
-seed = 0
+# NEpisodes = 20
+# Folders = 6 #[6, 7, 11, 12, 15]
+# Rand_traj = 4
+# seed = 0
 
-agent_NN_Q_learning_buffer = Q_learning_NN(seed, Folders, Rand_traj)
-reward_per_episode, traj, network_weights = agent_NN_Q_learning_buffer.Training_buffer(NEpisodes, seed)
-
-
-
-#%%
+# agent_NN_Q_learning_buffer = Q_learning_NN(seed, Folders, Rand_traj)
+# reward_per_episode, traj, network_weights = agent_NN_Q_learning_buffer.Training_buffer(NEpisodes, seed)
 
 
-coins_location = World.Foraging.CoinLocation(Folders, Rand_traj+1, 'full_coins') #np.random.randint(0,len(Time))
 
-n_episode = 9   
-time = np.linspace(0,500,3001)  
+# #%%
+
+
+# coins_location = World.Foraging.CoinLocation(Folders, Rand_traj+1, 'full_coins') #np.random.randint(0,len(Time))
+
+# n_episode = 9   
+# time = np.linspace(0,500,3001)  
  
-sigma1 = 0.5
-circle1 = ptch.Circle((6, 7.5), 2*sigma1, color='k',  fill=False)
-sigma2 = 1.1
-circle2 = ptch.Circle((-1.5, -5.0), 2*sigma2, color='k',  fill=False)
-sigma3 = 1.8
-circle3 = ptch.Circle((-5.0, 3.0), 2*sigma3, color='k',  fill=False)
-sigma4 = 1.3
-circle4 = ptch.Circle((4.9, -4.0), 2*sigma4, color='k',  fill=False)
-fig, ax = plt.subplots()
-ax.add_artist(circle1)
-ax.add_artist(circle2)
-ax.add_artist(circle3)
-ax.add_artist(circle4)
-plot_data = plt.scatter(traj[19][:,0], traj[19][:,1], c=time, marker='o', cmap='cool') #-1], marker='o', cmap='cool')
-plt.plot(0.1*coins_location[:,0], 0.1*coins_location[:,1], 'xb')
-cbar = fig.colorbar(plot_data, ticks=[10, 100, 200, 300, 400, 500])
-cbar.ax.set_yticklabels(['time = 0', 'time = 100', 'time = 200', 'time = 300', 'time = 400', 'time = 500'])
-plt.xlabel('x')
-plt.ylabel('y')
-plt.title('DQN trial')
-plt.savefig('Figures/FiguresDQN/simple_trial.eps', format='eps')
-plt.show()      
+# sigma1 = 0.5
+# circle1 = ptch.Circle((6, 7.5), 2*sigma1, color='k',  fill=False)
+# sigma2 = 1.1
+# circle2 = ptch.Circle((-1.5, -5.0), 2*sigma2, color='k',  fill=False)
+# sigma3 = 1.8
+# circle3 = ptch.Circle((-5.0, 3.0), 2*sigma3, color='k',  fill=False)
+# sigma4 = 1.3
+# circle4 = ptch.Circle((4.9, -4.0), 2*sigma4, color='k',  fill=False)
+# fig, ax = plt.subplots()
+# ax.add_artist(circle1)
+# ax.add_artist(circle2)
+# ax.add_artist(circle3)
+# ax.add_artist(circle4)
+# plot_data = plt.scatter(traj[19][:,0], traj[19][:,1], c=time, marker='o', cmap='cool') #-1], marker='o', cmap='cool')
+# plt.plot(0.1*coins_location[:,0], 0.1*coins_location[:,1], 'xb')
+# cbar = fig.colorbar(plot_data, ticks=[10, 100, 200, 300, 400, 500])
+# cbar.ax.set_yticklabels(['time = 0', 'time = 100', 'time = 200', 'time = 300', 'time = 400', 'time = 500'])
+# plt.xlabel('x')
+# plt.ylabel('y')
+# plt.title('DQN trial')
+# plt.savefig('Figures/FiguresDQN/simple_trial.eps', format='eps')
+# plt.show()      

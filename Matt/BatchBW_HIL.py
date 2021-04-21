@@ -39,7 +39,7 @@ class NN_PI_LO:
                 
     def NN_model(self):
         model = keras.Sequential([             
-                keras.layers.Dense(40, activation='relu', input_shape=(self.size_input,),
+                keras.layers.Dense(128, activation='relu', input_shape=(self.size_input,),
                                    kernel_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5, seed=0),
                                    bias_initializer=keras.initializers.Zeros()),                             
                 keras.layers.Dense(self.action_space, kernel_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5, seed=1)),
