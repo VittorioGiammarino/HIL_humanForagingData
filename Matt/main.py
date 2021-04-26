@@ -38,9 +38,21 @@ plt.plot(episodes, np.ones(len(episodes))*np.mean(Reward_eval_human),'k--', labe
 plt.plot(episodes, Reward_eval_human,'g', label = 'human agent evaluation')
 plt.xlabel('Episode')
 plt.ylabel('Reward')
-plt.title('Human agent performance')
+plt.title('Human agent performance Day 2')
 plt.legend()
-plt.savefig('Figures/FiguresDQN/Human_Reward.eps', format='eps')
+plt.ylim([75, 215])
+plt.savefig('Figures/FiguresExpert/Human_Reward.eps', format='eps')
+plt.show() 
+
+episodes = np.arange(0,len(Reward_training_human))
+plt.plot(episodes, np.ones(len(episodes))*np.mean(Reward_training_human),'k--', label = 'Average')
+plt.plot(episodes, Reward_training_human,'g', label = 'human agent evaluation')
+plt.xlabel('Episode')
+plt.ylabel('Reward')
+plt.title('Human agent performance Day 1')
+plt.legend()
+plt.ylim([75, 215])
+plt.savefig('Figures/FiguresExpert/Human_Reward_training.eps', format='eps')
 plt.show() 
 
 coins_location = World.Foraging.CoinLocation(Folders[0], Rand_traj+1, 'full_coins')
@@ -68,6 +80,27 @@ plt.title('Best Human traj, Reward {}'.format(Reward_eval_human[Rand_traj]))
 plt.savefig('Figures/FiguresExpert/Best_human_traj.eps', format='eps')
 plt.show()  
 
+# %%
+coins_location = World.Foraging.CoinLocation(Folders[0], Rand_traj+1, 'full_coins')
+
+sigma1 = 0.5
+circle1 = ptch.Circle((6, 7.5), 2*sigma1, color='k',  fill=False)
+sigma2 = 1.1
+circle2 = ptch.Circle((-1.5, -5), 2*sigma2, color='k',  fill=False)
+sigma3 = 1.8
+circle3 = ptch.Circle((-5, 3), 2*sigma3, color='k',  fill=False)
+sigma4 = 1.3
+circle4 = ptch.Circle((4.9, -4), 2*sigma4, color='k',  fill=False)
+fig, ax = plt.subplots()
+ax.add_artist(circle1)
+ax.add_artist(circle2)
+ax.add_artist(circle3)
+ax.add_artist(circle4) #-1], marker='o', cmap='cool')
+plt.plot(0.1*coins_location[:,0], 0.1*coins_location[:,1], 'xb')
+plt.xlabel('x')
+plt.ylabel('y')
+plt.savefig('Figures/FiguresExpert/Coins_Only.eps', format='eps')
+plt.show()  
 
 # %% 
 Folders = [6]
@@ -101,7 +134,19 @@ plt.xlabel('Episode')
 plt.ylabel('Reward')
 plt.title('Evaluation DQN')
 plt.legend()
+plt.ylim([20, 215])
 plt.savefig('Figures/FiguresDQN/DQN_evaluation.eps', format='eps')
+plt.show() 
+
+episodes = np.arange(0,len(Reward_eval_human))
+plt.plot(episodes, np.ones(len(episodes))*np.mean(Reward_eval_human),'k--', label = 'Average')
+plt.plot(episodes, Reward_eval_human,'g', label = 'human agent evaluation')
+plt.xlabel('Episode')
+plt.ylabel('Reward')
+plt.title('Human agent performance Day 2')
+plt.legend()
+plt.ylim([20, 215])
+plt.savefig('Figures/FiguresExpert/Human_Reward_comparison.eps', format='eps')
 plt.show() 
 
 coins_location = World.Foraging.CoinLocation(Folders[0], Rand_traj+1, 'full_coins') #np.random.randint(0,len(Time))
@@ -127,7 +172,7 @@ cbar.ax.set_yticklabels(['time = 0', 'time = 100', 'time = 200', 'time = 300', '
 plt.xlabel('x')
 plt.ylabel('y')
 plt.title('Best DQN Traj, reward {}'.format(best_reward[0]))
-plt.savefig('Figures/FiguresDQN/DQN_Evaluation.eps', format='eps')
+plt.savefig('Figures/FiguresDQN/DQN_Traj_example.eps', format='eps')
 plt.show() 
 
 # %%
@@ -291,14 +336,20 @@ environment = World.Foraging.env(Folders[0], Rand_traj, init_state = initial_sta
 initial_state = np.array([0, -2.6, 0, 8])
 Ncpu = Nseed
 pool = MyPool(Ncpu)
-args = [(seed, Folders[0], Rand_traj, NEpisodes, initial_state, model_BC_from_human.get_weights()) for seed in range(Nseed)]
-BC_from_human_evaluation_results = pool.starmap(evaluateBC_fromHuman, args) 
+# args = [(seed, Folders[0], Rand_traj, NEpisodes, initial_state, model_BC_from_human.get_weights()) for seed in range(Nseed)]
+# BC_from_human_evaluation_results = pool.starmap(evaluateBC_fromHuman, args) 
 # BC_from_human_evaluation_results = evaluate(0, Folders[0], Rand_traj, NEpisodes, initial_state, model_BC_from_human.get_weights())
 
 pool.close()
 pool.join()
 
 # %%
+
+# with open('4_walls_coins_task/BC_from_human_evaluation_results.npy', 'wb') as f:
+#     np.save(f, BC_from_human_evaluation_results)
+    
+with open('4_walls_coins_task/BC_from_human_evaluation_results.npy', 'rb') as f:
+    BC_from_human_evaluation_results = np.load(f, allow_pickle=True).tolist()
 
 N_agents = 1
 
@@ -353,6 +404,17 @@ plt.ylabel('Reward')
 plt.title('Evaluation BC')
 plt.legend()
 plt.savefig('Figures/FiguresBatch/BC_evaluation_trend.eps', format='eps')
+plt.show() 
+
+episodes = np.arange(0,len(BC_from_human_evaluation_results[int(best_agent[0])][0]))
+plt.plot(episodes,np.ones(len(episodes))*np.mean(BC_from_human_evaluation_results[int(best_agent[0])][0]),'k--', label='Evaluation Average')
+plt.plot(episodes, BC_from_human_evaluation_results[int(best_agent[0])][0],'g', label = 'HIL agent')
+plt.xlabel('Episode')
+plt.ylabel('Reward')
+plt.title('Evaluation BC')
+plt.legend()
+plt.ylim([0, 140])
+plt.savefig('Figures/FiguresBatch/BC_evaluation_trend_comparison.eps', format='eps')
 plt.show() 
 
 
@@ -496,13 +558,19 @@ Nseed=40
 initial_state = Trajectories[Rand_traj][0,:]
 Ncpu = Nseed
 pool = MyPool(Ncpu)
-args = [(seed, Folders[0], Rand_traj, NEpisodes, initial_state, pi_hi_batch.get_weights(), pi_lo_batch[0].get_weights(), pi_lo_batch[1].get_weights(), pi_b_batch[0].get_weights(), pi_b_batch[1].get_weights()) for seed in range(Nseed)]
-HIL_from_human_evaluation_results = pool.starmap(evaluateHIL_fromHuman, args) 
+# args = [(seed, Folders[0], Rand_traj, NEpisodes, initial_state, pi_hi_batch.get_weights(), pi_lo_batch[0].get_weights(), pi_lo_batch[1].get_weights(), pi_b_batch[0].get_weights(), pi_b_batch[1].get_weights()) for seed in range(Nseed)]
+# HIL_from_human_evaluation_results = pool.starmap(evaluateHIL_fromHuman, args) 
 pool.close()
 pool.join()
 
 
 # %%
+
+# with open('4_walls_coins_task/HIL_from_human_evaluation_results.npy', 'wb') as f:
+#     np.save(f, HIL_from_human_evaluation_results)
+    
+with open('4_walls_coins_task/HIL_from_human_evaluation_results.npy', 'rb') as f:
+    HIL_from_human_evaluation_results = np.load(f, allow_pickle=True).tolist()
 
 N_agents = 10
 
@@ -575,8 +643,8 @@ ax2.add_artist(circle4)
 # plt.ylim([-10, 10])
 plt.xlabel('x')
 plt.ylabel('y')
-plt.savefig('Figures/FiguresBatch/Traj_VS_Time_traj_reward{}.eps'.format(best_reward[0]), format='eps')
 plt.title('HIL agent, reward {}'.format(best_reward[0]))
+plt.savefig('Figures/FiguresBatch/Traj_VS_Time_traj_reward{}.eps'.format(best_reward[0]), format='eps')
 plt.show()  
 
 episodes = np.arange(0,len(HIL_from_human_evaluation_results[int(best_agent[0])][6]))
@@ -587,6 +655,17 @@ plt.ylabel('Reward')
 plt.title('Evaluation HIL')
 plt.legend()
 plt.savefig('Figures/FiguresBatch/HIL_evaluation_trend.eps', format='eps')
+plt.show() 
+
+episodes = np.arange(0,len(HIL_from_human_evaluation_results[int(best_agent[0])][6]))
+plt.plot(episodes,np.ones(len(episodes))*np.mean(HIL_from_human_evaluation_results[int(best_agent[0])][6]),'k--', label='Evaluation Average')
+plt.plot(episodes, HIL_from_human_evaluation_results[int(best_agent[0])][6],'g', label = 'HIL agent')
+plt.xlabel('Episode')
+plt.ylabel('Reward')
+plt.title('Evaluation HIL pre-init')
+plt.legend()
+plt.ylim([0, 140])
+plt.savefig('Figures/FiguresBatch/HIL_evaluation_trend_comparison.eps', format='eps')
 plt.show() 
 
 # %% Training single trajectory random initialization
@@ -668,13 +747,19 @@ Nseed=40
 initial_state = Trajectories[Rand_traj][0,:]
 Ncpu = Nseed
 pool = MyPool(Ncpu)
-args = [(seed, Folders[0], Rand_traj, NEpisodes, initial_state, pi_hi_batch.get_weights(), pi_lo_batch[0].get_weights(), pi_lo_batch[1].get_weights(), pi_b_batch[0].get_weights(), pi_b_batch[1].get_weights()) for seed in range(Nseed)]
-HIL_from_human_evaluation_results_random_init = pool.starmap(evaluateHIL_fromHuman, args) 
+# args = [(seed, Folders[0], Rand_traj, NEpisodes, initial_state, pi_hi_batch.get_weights(), pi_lo_batch[0].get_weights(), pi_lo_batch[1].get_weights(), pi_b_batch[0].get_weights(), pi_b_batch[1].get_weights()) for seed in range(Nseed)]
+# HIL_from_human_evaluation_results_random_init = pool.starmap(evaluateHIL_fromHuman, args) 
 pool.close()
-pool.join()
+pool.join()   
 
 
 # %%
+
+# with open('4_walls_coins_task/HIL_from_human_evaluation_results_random_init.npy', 'wb') as f:
+#     np.save(f, HIL_from_human_evaluation_results_random_init)
+    
+with open('4_walls_coins_task/HIL_from_human_evaluation_results_random_init.npy', 'rb') as f:
+    HIL_from_human_evaluation_results_random_init = np.load(f, allow_pickle=True).tolist()
 
 N_agents = 1
 
@@ -759,6 +844,17 @@ plt.ylabel('Reward')
 plt.title('Evaluation HIL')
 plt.legend()
 plt.savefig('Figures/FiguresBatch/HIL_evaluation_trend_random_init.eps', format='eps')
+plt.show() 
+
+episodes = np.arange(0,len(HIL_from_human_evaluation_results_random_init[int(best_agent[0])][6]))
+plt.plot(episodes,np.ones(len(episodes))*np.mean(HIL_from_human_evaluation_results_random_init[int(best_agent[0])][6]),'k--', label='Evaluation Average')
+plt.plot(episodes, HIL_from_human_evaluation_results_random_init[int(best_agent[0])][6],'g', label = 'HIL agent')
+plt.xlabel('Episode')
+plt.ylabel('Reward')
+plt.title('Evaluation HIL random init')
+plt.legend()
+plt.ylim([0, 140])
+plt.savefig('Figures/FiguresBatch/HIL_evaluation_trend_random_init_comparison.eps', format='eps')
 plt.show() 
 
 # %%
