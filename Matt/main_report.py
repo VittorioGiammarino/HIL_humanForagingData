@@ -1,6 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
+Created on Wed May 12 21:26:21 2021
+
+@author: vittorio
+"""
+
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
 Created on Mon Nov 23 16:24:05 2020
 
 @author: vittorio
@@ -190,140 +199,7 @@ plt.legend()
 plt.savefig('Figures/FiguresDQN/DQN_training_trend.eps', format='eps')
 plt.show() 
 
-#%% Learning from a human Expert
-# %% Behavioral Cloning
-size_data = len(Trajectories[Rand_traj])-1
-T_set = Trajectories[Rand_traj][0:size_data,:]
-# encode psi
-psi = T_set[:,2].reshape(len(T_set[:,2]),1)
-onehot_encoder = OneHotEncoder(sparse=False)
-onehot_encoded_psi = onehot_encoder.fit_transform(psi)
-# encode closest coin direction
-closest_coin_direction = T_set[:,3].reshape(len(T_set[:,3]),1)
-onehot_encoded_closest_coin_direction = onehot_encoder.fit_transform(closest_coin_direction)
-coordinates = T_set[:,0:2].reshape(len(T_set[:,0:2]),2)
-T_set = np.concatenate((coordinates,onehot_encoded_psi,onehot_encoded_closest_coin_direction),1)
-Heading_set = Rotation[Rand_traj][0:size_data]
-observation_space_size = T_set.shape[1]
-action_size = len(np.unique(Heading_set))
-
-model_BC_from_human = keras.Sequential([             
-        keras.layers.Dense(512, activation='relu', input_shape=(observation_space_size,),
-                           kernel_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5, seed=0),
-                           bias_initializer=keras.initializers.Zeros()),                                
-        keras.layers.Dense(action_size, kernel_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5, seed=2)),
-        keras.layers.Softmax()
-                         ])              
-
-model_BC_from_human.compile(optimizer='adam',
-                            loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-                            metrics=['accuracy'])
-
-model_BC_from_human.fit(T_set, Heading_set, epochs=200)
-
-# %%
-
-class NoDaemonProcess(multiprocessing.Process):
-    # make 'daemon' attribute always return False
-    def _get_daemon(self):
-        return False
-    def _set_daemon(self, value):
-        pass
-    daemon = property(_get_daemon, _set_daemon)
-
-# We sub-class multiprocessing.pool.Pool instead of multiprocessing.Pool
-# because the latter is only a wrapper function, not a proper class.
-class MyPool(multiprocessing.pool.Pool):
-    Process = NoDaemonProcess
-
-def EvaluationBC(Folder, Rand_traj, NEpisodes, initial_state, seed, model):
-
-    reward_per_episode =[]
-    traj = [[None]*1 for _ in range(NEpisodes)]
-    control = [[None]*1 for _ in range(NEpisodes)]
-    np.random.seed(seed)
-    observation_space_size = 13
-    env = World.Foraging.env(Folder, Rand_traj, init_state = initial_state)
-
-    for i_episode in range(NEpisodes):
-        x = np.empty((0, observation_space_size))
-        u = np.empty((0, 1))
-        current_state = env.reset('standard', init_state = initial_state)
-        coordinates = current_state[0:2]
-        psi = current_state[2]
-        psi_encoded = np.zeros(2) #psi dimension = 2
-        psi_encoded[int(psi)]=1
-        coin_dir_encoded = np.zeros(9) # coin dir dimension = 9
-        coin_dir = current_state[3]
-        coin_dir_encoded[int(coin_dir)]=1
-        current_state_encoded = np.concatenate((coordinates,psi_encoded,coin_dir_encoded))            
-        cum_reward = 0 
-        x = np.append(x, current_state_encoded.reshape(1, observation_space_size), 0)
-        
-        for t in range(3000):
-            # draw action
-            prob_u = model(current_state_encoded.reshape(1, observation_space_size)).numpy()
-            prob_u_rescaled = np.divide(prob_u,np.amin(prob_u)+0.01)
-            for i in range(1,prob_u_rescaled.shape[1]):
-                prob_u_rescaled[0,i]=prob_u_rescaled[0,i]+prob_u_rescaled[0,i-1]
-            draw_u=np.divide(np.random.rand(),np.amin(prob_u)+0.01)
-            action = np.amin(np.where(draw_u<prob_u_rescaled)[1])
-                               
-            obs, reward = env.step(action)
-            current_state = obs
-            coordinates = current_state[0:2]
-            psi = current_state[2]
-            psi_encoded = np.zeros(2)
-            psi_encoded[int(psi)]=1
-            coin_dir_encoded = np.zeros(9)
-            coin_dir = current_state[3]
-            coin_dir_encoded[int(coin_dir)]=1
-            current_state_encoded = np.concatenate((coordinates,psi_encoded,coin_dir_encoded))   
-            x = np.append(x, current_state_encoded.reshape(1, observation_space_size), 0)
-            u = np.append(u, [[action]], 0)
-            cum_reward = cum_reward + reward
-                                
-        print("Episode {}: cumulative reward = {}".format(i_episode, cum_reward))
-        reward_per_episode.append(cum_reward)
-        traj[i_episode] = x    
-        control[i_episode] = u
-    
-    return  reward_per_episode, traj, control
-
-def evaluateBC_fromHuman(seed, Folder, Rand_traj, NEpisodes, initial_state, weights):
-    
-    observation_space_size = 13
-    action_size = 8
-    model = keras.Sequential([             
-            keras.layers.Dense(512, activation='relu', input_shape=(observation_space_size,),
-                           kernel_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5, seed=0),
-                           bias_initializer=keras.initializers.Zeros()),                                
-            keras.layers.Dense(action_size, kernel_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5, seed=2)),
-            keras.layers.Softmax()
-                         ])   
-    model.set_weights(weights)
-    reward_per_episode, traj, network_weights = EvaluationBC(Folder, Rand_traj, NEpisodes, initial_state, seed, model)
-    return reward_per_episode, traj, network_weights
-    
-NEpisodes = 100
-Nseed=40
-initial_state = Trajectories[Rand_traj][0,:]
-environment = World.Foraging.env(Folders[0], Rand_traj, init_state = initial_state)
-
-initial_state = np.array([0, -2.6, 0, 8])
-Ncpu = Nseed
-pool = MyPool(Ncpu)
-# args = [(seed, Folders[0], Rand_traj, NEpisodes, initial_state, model_BC_from_human.get_weights()) for seed in range(Nseed)]
-# BC_from_human_evaluation_results = pool.starmap(evaluateBC_fromHuman, args) 
-# BC_from_human_evaluation_results = evaluate(0, Folders[0], Rand_traj, NEpisodes, initial_state, model_BC_from_human.get_weights())
-
-pool.close()
-pool.join()
-
-# %%
-
-# with open('4_walls_coins_task/BC_from_human_evaluation_results.npy', 'wb') as f:
-#     np.save(f, BC_from_human_evaluation_results)
+#%% Learning from a human Expert Behavioral Cloning
     
 with open('Results_main/BC_from_human_evaluation_results.npy', 'rb') as f:
     BC_from_human_evaluation_results = np.load(f, allow_pickle=True).tolist()
@@ -372,130 +248,7 @@ plt.ylim([0, 300])
 plt.savefig('Figures/FiguresBC/BC_evaluation_trend.eps', format='eps')
 plt.show() 
 
-# %% train_pi_hi
-# Need to run but in practice it is unused
-
-T_set = Trajectories[Rand_traj][0:size_data,:]
-# encode psi
-psi = T_set[:,2].reshape(len(T_set[:,2]),1)
-onehot_encoder = OneHotEncoder(sparse=False)
-onehot_encoded_psi = onehot_encoder.fit_transform(psi)
-
-# encode closest coin direction
-closest_coin_direction = T_set[:,3].reshape(len(T_set[:,3]),1)
-onehot_encoded_closest_coin_direction = onehot_encoder.fit_transform(closest_coin_direction)
-
-coordinates = T_set[:,0:2].reshape(len(T_set[:,0:2]),2)
-
-T_set = np.concatenate((coordinates,onehot_encoded_psi,onehot_encoded_closest_coin_direction),1)
-
-
-option_space = 2
-size_input = T_set.shape[1]
-# T_set =TrainingSet
-pi_hi = BatchBW_HIL.NN_PI_HI(option_space, size_input)
-pi_hi_model = pi_hi.PreTraining(T_set)
-
-options_predictions = pi_hi_model.predict(T_set)
-
-
-# %% Training single trajectory pre initialized
-Likelihood_batch_list = []
-Rand_traj = 2
-size_data = len(Trajectories[Rand_traj])-1
-T_set = Trajectories[Rand_traj][0:size_data,:]
-# encode psi
-psi = T_set[:,2].reshape(len(T_set[:,2]),1)
-onehot_encoder = OneHotEncoder(sparse=False)
-onehot_encoded_psi = onehot_encoder.fit_transform(psi)
-# encode closest coin direction
-closest_coin_direction = T_set[:,3].reshape(len(T_set[:,3]),1)
-onehot_encoded_closest_coin_direction = onehot_encoder.fit_transform(closest_coin_direction)
-coordinates = T_set[:,0:2].reshape(len(T_set[:,0:2]),2)
-T_set = np.concatenate((coordinates,onehot_encoded_psi,onehot_encoded_closest_coin_direction),1)
-Heading_set = Rotation[Rand_traj][0:size_data]
-option_space = 2
-M_step_epoch = 10
-size_batch = 32
-optimizer = keras.optimizers.Adamax(learning_rate=1e-1)
-# Agent_BatchHIL = BatchBW_HIL.BatchHIL_param_simplified(T_set, Heading_set, M_step_epoch, size_batch, optimizer) 
-Agent_BatchHIL = BatchBW_HIL.BatchHIL(T_set, Heading_set, option_space, M_step_epoch, size_batch, optimizer, options_predictions)
-N=10 #number of iterations for the BW algorithm
-pi_hi_batch, pi_lo_batch, pi_b_batch, likelihood = Agent_BatchHIL.Baum_Welch(N)
-Likelihood_batch_list.append(likelihood)
-
-# %evaluation
-# coins_location = World.Foraging.CoinLocation(6, Rand_traj+1, 'full_coins')
-# seed = 0
-# BatchSim = World.Simulation_NN(pi_hi_batch, pi_lo_batch, pi_b_batch)
-# [trajBatch, controlBatch, OptionsBatch, TerminationBatch, psiBatch, coin_directionBatch, rewardBatch] = BatchSim.HierarchicalStochasticSampleTrajMDP(seed, 3000, 1, initial_state[0:2], Folders[0], Rand_traj)
-
-# BatchBW_HIL.NN_PI_HI.save(pi_hi_batch, 'Models/Saved_Model_Batch/pi_hi_NN_preinit')
-# for i in range(option_space):
-#     BatchBW_HIL.NN_PI_LO.save(pi_lo_batch[i], 'Models/Saved_Model_Batch/pi_lo_NN_{}_pi_hi_NN_preinit'.format(i))
-#     BatchBW_HIL.NN_PI_B.save(pi_b_batch[i], 'Models/Saved_Model_Batch/pi_b_NN_{}_pi_hi_NN_preinit'.format(i))
-# %
-# %%
-
-pi_hi_batch = BatchBW_HIL.NN_PI_HI.load('Models/Saved_Model_Batch/pi_hi_NN_preinit')
-pi_lo_batch = []
-pi_b_batch = []
-option_space = 2
-for i in range(option_space):
-    pi_lo_batch.append(BatchBW_HIL.NN_PI_LO.load('Models/Saved_Model_Batch/pi_lo_NN_{}_pi_hi_NN_preinit'.format(i)))
-    pi_b_batch.append(BatchBW_HIL.NN_PI_B.load('Models/Saved_Model_Batch/pi_b_NN_{}_pi_hi_NN_preinit'.format(i)))
-
-def evaluateHIL_fromHuman(seed, Folder, Rand_traj, NEpisodes, initial_state, pi_hi_batch_weights, pi_lo_batch_weights1, pi_lo_batch_weights2, pi_b_batch_weights1, pi_b_batch_weights2):
-    
-    option_space = 2
-    termination_space = 2
-    observation_space_size = 13
-    action_size = 8
-    
-    pi_hi = BatchBW_HIL.NN_PI_HI(option_space, observation_space_size)
-    pi_lo1 = BatchBW_HIL.NN_PI_LO(action_size, observation_space_size)
-    pi_lo2 = BatchBW_HIL.NN_PI_LO(action_size, observation_space_size)
-    pi_b1 = BatchBW_HIL.NN_PI_B(termination_space, observation_space_size)
-    pi_b2 = BatchBW_HIL.NN_PI_B(termination_space, observation_space_size)
-    
-    pi_hi_batch = pi_hi.NN_model()
-    pi_hi_batch.set_weights(pi_hi_batch_weights)
-    
-    pi_lo_batch = []
-    pi_lo1_model = pi_lo1.NN_model()
-    pi_lo1_model.set_weights(pi_lo_batch_weights1)
-    pi_lo_batch.append(pi_lo1_model)
-    pi_lo2_model = pi_lo2.NN_model()
-    pi_lo2_model.set_weights(pi_lo_batch_weights2)
-    pi_lo_batch.append(pi_lo2_model)
-    
-    pi_b_batch = []
-    pi_b1_model = pi_b1.NN_model()
-    pi_b1_model.set_weights(pi_b_batch_weights1)
-    pi_b_batch.append(pi_b1_model)
-    pi_b2_model = pi_b2.NN_model()
-    pi_b2_model.set_weights(pi_b_batch_weights2)
-    pi_b_batch.append(pi_b2_model)
-    
-    BatchSim = World.Simulation_NN(pi_hi_batch, pi_lo_batch, pi_b_batch)
-    [trajBatch, controlBatch, OptionsBatch, TerminationBatch, psiBatch, coin_directionBatch, rewardBatch] = BatchSim.HierarchicalStochasticSampleTrajMDP(seed, 3000, NEpisodes, initial_state[0:2], Folder, Rand_traj)
-        
-    return trajBatch, controlBatch, OptionsBatch, TerminationBatch, psiBatch, coin_directionBatch, rewardBatch
-    
-NEpisodes = 100
-Nseed=40
-initial_state = Trajectories[Rand_traj][0,:]
-Ncpu = Nseed
-pool = MyPool(Ncpu)
-args = [(seed, Folders[0], Rand_traj, NEpisodes, initial_state, pi_hi_batch.get_weights(), pi_lo_batch[0].get_weights(), pi_lo_batch[1].get_weights(), pi_b_batch[0].get_weights(), pi_b_batch[1].get_weights()) for seed in range(Nseed)]
-HIL_from_human_evaluation_results = pool.starmap(evaluateHIL_fromHuman, args) 
-pool.close()
-pool.join()
-
-# %%
-
-# with open('4_walls_coins_task/HIL_from_human_evaluation_results.npy', 'wb') as f:
-#     np.save(f, HIL_from_human_evaluation_results)
+# %% HIL-preinitialized from human
     
 with open('Results_main/HIL_from_human_evaluation_results.npy', 'rb') as f:
     HIL_from_human_evaluation_results = np.load(f, allow_pickle=True).tolist()
@@ -572,103 +325,8 @@ plt.ylim([0, 300])
 plt.savefig('Figures/FiguresBatch/HIL_evaluation_trend.eps', format='eps')
 plt.show() 
 
-# %% Training single trajectory random initialization
-Likelihood_batch_list = []
-Rand_traj = 2
-size_data = len(Trajectories[Rand_traj])-1
-T_set = Trajectories[Rand_traj][0:size_data,:]
-# encode psi
-psi = T_set[:,2].reshape(len(T_set[:,2]),1)
-onehot_encoder = OneHotEncoder(sparse=False)
-onehot_encoded_psi = onehot_encoder.fit_transform(psi)
-# encode closest coin direction
-closest_coin_direction = T_set[:,3].reshape(len(T_set[:,3]),1)
-onehot_encoded_closest_coin_direction = onehot_encoder.fit_transform(closest_coin_direction)
-coordinates = T_set[:,0:2].reshape(len(T_set[:,0:2]),2)
-T_set = np.concatenate((coordinates,onehot_encoded_psi,onehot_encoded_closest_coin_direction),1)
-Heading_set = Rotation[Rand_traj][0:size_data]
-option_space = 2
-M_step_epoch = 10
-size_batch = 32
-optimizer = keras.optimizers.Adamax(learning_rate=1e-1)
-# Agent_BatchHIL = BatchBW_HIL.BatchHIL_param_simplified(T_set, Heading_set, M_step_epoch, size_batch, optimizer) 
-Agent_BatchHIL = BatchBW_HIL.BatchHIL(T_set, Heading_set, option_space, M_step_epoch, size_batch, optimizer, options_predictions, NN_init='random')
-N=10 #number of iterations for the BW algorithm
-pi_hi_batch, pi_lo_batch, pi_b_batch, likelihood = Agent_BatchHIL.Baum_Welch(N)
-Likelihood_batch_list.append(likelihood)
 
-BatchBW_HIL.NN_PI_HI.save(pi_hi_batch, 'Models/Saved_Model_Batch/pi_hi_NN_randominit')
-for i in range(option_space):
-    BatchBW_HIL.NN_PI_LO.save(pi_lo_batch[i], 'Models/Saved_Model_Batch/pi_lo_NN_{}_pi_hi_NN_randominit'.format(i))
-    BatchBW_HIL.NN_PI_B.save(pi_b_batch[i], 'Models/Saved_Model_Batch/pi_b_NN_{}_pi_hi_NN_randominit'.format(i))
-
-# %%evaluation
-# coins_location = World.Foraging.CoinLocation(6, Rand_traj+1, 'full_coins')
-# seed = 0
-# BatchSim = World.Simulation_NN(pi_hi_batch, pi_lo_batch, pi_b_batch)
-# [trajBatch, controlBatch, OptionsBatch, TerminationBatch, psiBatch, coin_directionBatch, rewardBatch] = BatchSim.HierarchicalStochasticSampleTrajMDP(seed, 3000, 1, initial_state[0:2], Folders[0], Rand_traj)
-
-pi_hi_batch = BatchBW_HIL.NN_PI_HI.load('Models/Saved_Model_Batch/pi_hi_NN_randominit')
-pi_lo_batch = []
-pi_b_batch = []
-option_space = 2
-for i in range(option_space):
-    pi_lo_batch.append(BatchBW_HIL.NN_PI_LO.load('Models/Saved_Model_Batch/pi_lo_NN_{}_pi_hi_NN_randominit'.format(i)))
-    pi_b_batch.append(BatchBW_HIL.NN_PI_B.load('Models/Saved_Model_Batch/pi_b_NN_{}_pi_hi_NN_randominit'.format(i)))
-
-
-def evaluateHIL_fromHuman(seed, Folder, Rand_traj, NEpisodes, initial_state, pi_hi_batch_weights, pi_lo_batch_weights1, pi_lo_batch_weights2, pi_b_batch_weights1, pi_b_batch_weights2):
-    
-    option_space = 2
-    termination_space = 2
-    observation_space_size = 13
-    action_size = 8
-    
-    pi_hi = BatchBW_HIL.NN_PI_HI(option_space, observation_space_size)
-    pi_lo1 = BatchBW_HIL.NN_PI_LO(action_size, observation_space_size)
-    pi_lo2 = BatchBW_HIL.NN_PI_LO(action_size, observation_space_size)
-    pi_b1 = BatchBW_HIL.NN_PI_B(termination_space, observation_space_size)
-    pi_b2 = BatchBW_HIL.NN_PI_B(termination_space, observation_space_size)
-    
-    pi_hi_batch = pi_hi.NN_model()
-    pi_hi_batch.set_weights(pi_hi_batch_weights)
-    
-    pi_lo_batch = []
-    pi_lo1_model = pi_lo1.NN_model()
-    pi_lo1_model.set_weights(pi_lo_batch_weights1)
-    pi_lo_batch.append(pi_lo1_model)
-    pi_lo2_model = pi_lo2.NN_model()
-    pi_lo2_model.set_weights(pi_lo_batch_weights2)
-    pi_lo_batch.append(pi_lo2_model)
-    
-    pi_b_batch = []
-    pi_b1_model = pi_b1.NN_model()
-    pi_b1_model.set_weights(pi_b_batch_weights1)
-    pi_b_batch.append(pi_b1_model)
-    pi_b2_model = pi_b2.NN_model()
-    pi_b2_model.set_weights(pi_b_batch_weights2)
-    pi_b_batch.append(pi_b2_model)
-    
-    BatchSim = World.Simulation_NN(pi_hi_batch, pi_lo_batch, pi_b_batch)
-    [trajBatch, controlBatch, OptionsBatch, TerminationBatch, psiBatch, coin_directionBatch, rewardBatch] = BatchSim.HierarchicalStochasticSampleTrajMDP(seed, 3000, NEpisodes, initial_state[0:2], Folder, Rand_traj)
-        
-    return trajBatch, controlBatch, OptionsBatch, TerminationBatch, psiBatch, coin_directionBatch, rewardBatch
-    
-NEpisodes = 100
-Nseed=40
-initial_state = Trajectories[Rand_traj][0,:]
-Ncpu = Nseed
-pool = MyPool(Ncpu)
-args = [(seed, Folders[0], Rand_traj, NEpisodes, initial_state, pi_hi_batch.get_weights(), pi_lo_batch[0].get_weights(), pi_lo_batch[1].get_weights(), pi_b_batch[0].get_weights(), pi_b_batch[1].get_weights()) for seed in range(Nseed)]
-HIL_from_human_evaluation_results_random_init = pool.starmap(evaluateHIL_fromHuman, args) 
-pool.close()
-pool.join()   
-
-with open('Results_main/HIL_from_human_evaluation_results_random_init.npy', 'wb') as f:
-    np.save(f, HIL_from_human_evaluation_results_random_init)
-
-# %%
-
+# %% HIL-random initialization from human
 
 with open('Results_main/HIL_from_human_evaluation_results_random_init.npy', 'rb') as f:
     HIL_from_human_evaluation_results_random_init = np.load(f, allow_pickle=True).tolist()
@@ -748,13 +406,7 @@ plt.savefig('Figures/FiguresBatch/HIL_evaluation_trend_random_init.eps', format=
 plt.show() 
 
 
-# %%
-# BatchBW_HIL.NN_PI_HI.save(pi_hi_batch, 'Models/Saved_Model_Batch/pi_hi_NN')
-# for i in range(option_space):
-#     BatchBW_HIL.NN_PI_LO.save(pi_lo_batch[i], 'Models/Saved_Model_Batch/pi_lo_NN_{}'.format(i))
-#     BatchBW_HIL.NN_PI_B.save(pi_b_batch[i], 'Models/Saved_Model_Batch/pi_b_NN_{}'.format(i))
-
-# %% Training Option Critic
+# %% Training Option Critic starting from HIL preinit
 
 with open('RL_algorithms/Option_critic_with_DQN/Results/DeepSoftOC_learning_results_second_attempt.npy', 'rb') as f:
     DeepSoftOC_learning_results = np.load(f, allow_pickle=True).tolist()

@@ -654,7 +654,7 @@ class Simulation_NN:
         option_space = len(pi_lo)
         self.option_space = option_space
         self.mu = np.ones(option_space)*np.divide(1,option_space)
-        self.zeta = 0.0001
+        self.zeta = 0
         self.pi_hi = pi_hi
         self.pi_lo = pi_lo
         self.pi_b = pi_b      
@@ -697,7 +697,7 @@ class Simulation_NN:
         
         return state_plus1             
                 
-    def HierarchicalStochasticSampleTrajMDP(self, seed, max_epoch_per_traj, number_of_trajectories, initial_state, Folder, expert_traj, version = 'complete'):
+    def HierarchicalStochasticSampleTrajMDP(self, seed, max_epoch_per_traj, number_of_trajectories, initial_state, Folder, expert_traj, version = 'complete', version_coins = 'full_coins'):
         
         # version = simplified, for small action space, or complete, for full action space 
         np.random.seed(seed)
@@ -711,7 +711,7 @@ class Simulation_NN:
         
     
         for t in range(0,number_of_trajectories):      
-            coin_location = 0.1*Foraging.CoinLocation(Folder, expert_traj+1)
+            coin_location = 0.1*Foraging.CoinLocation(Folder, expert_traj+1, version_coins)
             x = np.empty((0,2))
             x = np.append(x, initial_state.reshape(1,2), 0)
             u_tot = np.empty((0,0))
@@ -728,19 +728,24 @@ class Simulation_NN:
             coin_dir_encoded = np.zeros((1,9))
             coin_dir_encoded[0,coin_direction]=1
             r=0
+            
+            state_partial = x[0,:].reshape(1,2)
+            state = np.concatenate((state_partial, psi_encoded, coin_dir_encoded),1)
         
             # Initial Option
-            prob_o = self.mu
+            prob_o = self.pi_hi(state).numpy()
             prob_o_rescaled = np.divide(prob_o, np.amin(prob_o)+0.01)
-            for i in range(1,prob_o_rescaled.shape[0]):
-                prob_o_rescaled[i]=prob_o_rescaled[i]+prob_o_rescaled[i-1]
+            for i in range(1,prob_o_rescaled.shape[1]):
+                prob_o_rescaled[0,i]=prob_o_rescaled[0,i]+prob_o_rescaled[0,i-1]
             draw_o=np.divide(np.random.rand(), np.amin(prob_o)+0.01)
-            o = np.amin(np.where(draw_o<prob_o_rescaled))
+            temp = np.where(draw_o<=prob_o_rescaled)[1]
+            if temp.size == 0:
+                 o = np.argmax(prob_o)
+            else:
+                 o = np.amin(np.where(draw_o<=prob_o_rescaled)[1])
             o_tot = np.append(o_tot,o)
         
             # Termination
-            state_partial = x[0,:].reshape(1,2)
-            state = np.concatenate((state_partial, psi_encoded, coin_dir_encoded),1)
             prob_b = self.pi_b[o](state).numpy()
             prob_b_rescaled = np.divide(prob_b,np.amin(prob_b)+0.01)
             for i in range(1,prob_b_rescaled.shape[1]):
@@ -768,7 +773,11 @@ class Simulation_NN:
             for i in range(1,prob_o_rescaled.shape[1]):
                 prob_o_rescaled[0,i]=prob_o_rescaled[0,i]+prob_o_rescaled[0,i-1]
             draw_o=np.divide(np.random.rand(), np.amin(prob_o)+0.01)
-            o = np.amin(np.where(draw_o<prob_o_rescaled)[1])
+            temp = np.where(draw_o<=prob_o_rescaled)[1]
+            if temp.size == 0:
+                 o = np.argmax(prob_o)
+            else:
+                 o = np.amin(np.where(draw_o<=prob_o_rescaled)[1])
             o_tot = np.append(o_tot,o)
         
             for k in range(0,max_epoch_per_traj):
@@ -860,7 +869,11 @@ class Simulation_NN:
                 for i in range(1,prob_o_rescaled.shape[1]):
                     prob_o_rescaled[0,i]=prob_o_rescaled[0,i]+prob_o_rescaled[0,i-1]
                 draw_o=np.divide(np.random.rand(), np.amin(prob_o)+0.01)
-                o = np.amin(np.where(draw_o<prob_o_rescaled)[1])
+                temp = np.where(draw_o<=prob_o_rescaled)[1]
+                if temp.size == 0:
+                     o = np.argmax(prob_o)
+                else:
+                     o = np.amin(np.where(draw_o<=prob_o_rescaled)[1])
                 o_tot = np.append(o_tot,o)
             
             print("Episode {}: cumulative reward = {}".format(t, r))
