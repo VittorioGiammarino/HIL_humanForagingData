@@ -197,7 +197,7 @@ class Option_Critic_with_DQN:
             draw_u=np.divide(np.random.rand(),np.amin(prob_u)+0.01)
             current_action = np.amin(np.where(draw_u<prob_u_rescaled)[1])
             
-            for t in range(3000):
+            for t in range(4000):
                 
                 obs, reward = self.env.step(current_action)
                 new_state = obs
@@ -371,7 +371,7 @@ def train(NEpisodes, seed, Folders, Rand_traj, option_space, pi_hi_batch, pi_lo_
     return reward_per_episode_OC, traj_OC, Option_OC, Termination_OC, pi_hi, pi_lo, pi_b
 
 
-NEpisodes = 500
+NEpisodes = 1000
 Folders = 6 #[6, 7, 11, 12, 15]
 Rand_traj = 2
 seeds = [31] #[13, 29, 33, 36, 27, 21, 15, 31]
@@ -396,7 +396,7 @@ for seed in seeds:
     DeepSoftOC_learning_results.append([reward_per_episode_OC, traj_OC, Option_OC, Termination_OC, pi_hi, pi_lo, pi_b])
     
     
-with open('RL_algorithms/Option_critic_with_DQN/Results/DeepSoftOC_learning_results_second_attempt.npy', 'wb') as f:
+with open('RL_algorithms/Option_critic_with_DQN/Results/DeepSoftOC_learning_results_third_attempt.npy', 'wb') as f:
     np.save(f, DeepSoftOC_learning_results)
     
 # %%

@@ -12,6 +12,8 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as ptch
 import World
 import BatchBW_HIL
+import OnlineBW_HIL
+import OnlineBW_HIL_Neural
 from utils_main import Show_DataSet
 from utils_main import Show_Training
 from sklearn.preprocessing import OneHotEncoder
@@ -23,13 +25,17 @@ Folders = [6] #[6, 7, 11, 12, 15]
 size_data = 3100
 Rand_traj = 2
 
-TrainingSet, Labels, Trajectories, Rotation, Time, _ = Show_DataSet(Folders, size_data, Rand_traj, 'complete', 'distr_only', 'plot')
+TrainingSet, Labels, Trajectories, Rotation, Time, _, _ = Show_DataSet(Folders, size_data, Rand_traj, 'complete', 'distr_only', 'plot')
 # _,_,_,_,_,_ = Show_DataSet(Folders, size_data, Rand_traj, 'simplified', 'distr_only')
-_,_,_,_,_, Reward_eval_human  = Show_DataSet(Folders, size_data, Rand_traj, 'complete', 'full_coins', 'plot')
+_,_,_,_,_, Reward_eval_human, Real_Reward_eval_human  = Show_DataSet(Folders, size_data, Rand_traj, 'complete', 'full_coins', 'no plot')
 # _,_,_,_,_,_  = Show_DataSet(Folders, size_data, Rand_traj, 'simplified', 'full_coins')
-_, _, _, _, _, Reward_training_human = Show_Training(Folders, size_data, Rand_traj, 'complete', 'full_coins', 'no plot')
+_, _, _, _, _, Reward_training_human, Real_Reward_training_human = Show_Training(Folders, size_data, Rand_traj, 'complete', 'full_coins', 'no plot')
+
 
 # %% Plot human expert
+
+np.mean(Real_Reward_eval_human)
+np.mean(Real_Reward_training_human)
 
 # Plot Human Day 1
 episodes = np.arange(0,len(Reward_eval_human))
@@ -79,6 +85,7 @@ plt.ylabel('y')
 plt.title('Best Human traj, Reward {}'.format(Reward_eval_human[Rand_traj]))
 plt.savefig('Figures/FiguresExpert/Best_human_traj.eps', format='eps')
 plt.show()  
+
 
 # %%
 coins_location = World.Foraging.CoinLocation(Folders[0], Rand_traj+1, 'full_coins')
@@ -399,7 +406,7 @@ pi_hi_model = pi_hi.PreTraining(T_set)
 options_predictions = pi_hi_model.predict(T_set)
 
 
-# %% Training single trajectory pre initialized
+# %% Training single trajectory pre initialized batch
 Likelihood_batch_list = []
 Rand_traj = 2
 size_data = len(Trajectories[Rand_traj])-1
@@ -430,11 +437,41 @@ Likelihood_batch_list.append(likelihood)
 # BatchSim = World.Simulation_NN(pi_hi_batch, pi_lo_batch, pi_b_batch)
 # [trajBatch, controlBatch, OptionsBatch, TerminationBatch, psiBatch, coin_directionBatch, rewardBatch] = BatchSim.HierarchicalStochasticSampleTrajMDP(seed, 3000, 1, initial_state[0:2], Folders[0], Rand_traj)
 
+# %%
 # BatchBW_HIL.NN_PI_HI.save(pi_hi_batch, 'Models/Saved_Model_Batch/pi_hi_NN_preinit')
 # for i in range(option_space):
 #     BatchBW_HIL.NN_PI_LO.save(pi_lo_batch[i], 'Models/Saved_Model_Batch/pi_lo_NN_{}_pi_hi_NN_preinit'.format(i))
 #     BatchBW_HIL.NN_PI_B.save(pi_b_batch[i], 'Models/Saved_Model_Batch/pi_b_NN_{}_pi_hi_NN_preinit'.format(i))
 # %
+# %% Online BW for HIL
+Rand_traj = 2
+size_data = len(Trajectories[Rand_traj])-1
+T_set = Trajectories[Rand_traj][0:size_data,:]
+# encode psi
+psi = T_set[:,2].reshape(len(T_set[:,2]),1)
+onehot_encoder = OneHotEncoder(sparse=False)
+onehot_encoded_psi = onehot_encoder.fit_transform(psi)
+# encode closest coin direction
+closest_coin_direction = T_set[:,3].reshape(len(T_set[:,3]),1)
+onehot_encoded_closest_coin_direction = onehot_encoder.fit_transform(closest_coin_direction)
+coordinates = T_set[:,0:2].reshape(len(T_set[:,0:2]),2)
+T_set = np.concatenate((coordinates,onehot_encoded_psi,onehot_encoded_closest_coin_direction),1)
+Heading_set = Rotation[Rand_traj][0:size_data]
+option_space = 2
+M_step_epoch = 10
+size_batch = 32
+optimizer = keras.optimizers.Adamax(learning_rate=1e-1)
+# Agent_BatchHIL = BatchBW_HIL.BatchHIL_param_simplified(T_set, Heading_set, M_step_epoch, size_batch, optimizer) 
+Agent_OnlineHIL = OnlineBW_HIL.OnlineHIL(T_set, Heading_set, option_space, M_step_epoch, optimizer)
+T_min=100 #number of iterations for the BW algorithm
+pi_hi_online, pi_lo_online, pi_b_online =  Agent_OnlineHIL.Online_Baum_Welch_together(T_min)
+
+# %% 
+OnlineBW_HIL.NN_PI_HI.save(pi_hi_online, 'Models/Saved_Model_Online/pi_hi_online_NN_preinit')
+for i in range(option_space):
+    OnlineBW_HIL.NN_PI_LO.save(pi_lo_online[i], 'Models/Saved_Model_Online/pi_lo_NN_{}_online_preinit'.format(i))
+    OnlineBW_HIL.NN_PI_B.save(pi_b_online[i], 'Models/Saved_Model_Online/pi_b_NN_{}_online_preinit'.format(i))
+
 # %%
 
 pi_hi_batch = BatchBW_HIL.NN_PI_HI.load('Models/Saved_Model_Batch/pi_hi_NN_preinit')

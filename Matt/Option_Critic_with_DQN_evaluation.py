@@ -49,8 +49,6 @@ for i in range(len(DeepSoftOC_learning_results)):
             best_pi_b[k] = DeepSoftOC_learning_results[i][6][j]
             best_agent[k]=j
 
-
-            
   
 # %%
 
@@ -203,7 +201,7 @@ class Option_Critic_with_DQN_eval:
             draw_u=np.divide(np.random.rand(),np.amin(prob_u)+0.01)
             current_action = np.amin(np.where(draw_u<prob_u_rescaled)[1])
             
-            for t in range(3000):
+            for t in range(4000):
                 
                 obs, reward = self.env.step(current_action)
                 new_state = obs
@@ -263,7 +261,7 @@ class Option_Critic_with_DQN_eval:
                     draw_u = 1
                     new_action = np.argmax(prob_u)
                 else:
-                    new_action = np.amin(np.where(draw_u<prob_u_rescaled)[1])  
+                    new_action = np.amin(np.where(draw_u<=prob_u_rescaled)[1])  
                 
                 current_state = new_state
                 current_state_encoded = new_state_encoded
@@ -280,6 +278,95 @@ class Option_Critic_with_DQN_eval:
             Termination[i_episode] = b_tot
         
         return traj, Option, Termination, reward_per_episode
+    
+    def evaluateOC_greedy(self, NEpisodes, seed, reset = 'random', initial_state = np.array([0,0,0,8])):
+    
+           reward_per_episode =[]
+           np.random.seed(seed)
+           traj = [[None]*1 for _ in range(NEpisodes)]
+           Option = [[None]*1 for _ in range(NEpisodes)]
+           Termination = [[None]*1 for _ in range(NEpisodes)]
+            
+           for i_episode in range(NEpisodes):
+               
+               o_tot = np.empty((0,0),int)
+               b_tot = np.empty((0,0),int)
+               x = np.empty((0, self.observation_space_size))
+       
+               current_state = self.env.reset(reset, initial_state)
+               coordinates = current_state[0:2]
+               psi = current_state[2]
+               psi_encoded = np.zeros(self.view)
+               psi_encoded[int(psi)]=1
+               coin_dir_encoded = np.zeros(self.closest_coin_dir)
+               coin_dir = current_state[3]
+               coin_dir_encoded[int(coin_dir)]=1
+               current_state_encoded = np.concatenate((coordinates,psi_encoded,coin_dir_encoded))
+               cum_reward = 0 
+               x = np.append(x, current_state.reshape(1, self.observation_space_size), 0)
+                                  
+               # Initial Option
+               prob_o = self.pi_hi_batch(current_state_encoded.reshape(1, self.observation_space_size_encoded)).numpy()
+               option = np.argmax(prob_o)
+               o_tot = np.append(o_tot,option)
+               
+               # draw action
+               prob_u = self.pi_lo_batch[option](current_state_encoded.reshape(1, self.observation_space_size_encoded)).numpy()
+               current_action = np.argmax(prob_u)
+               
+               for t in range(4000):
+                   
+                   obs, reward = self.env.step(current_action)
+                   new_state = obs
+                   coordinates = new_state[0:2]
+                   psi = new_state[2]
+                   psi_encoded = np.zeros(self.view)
+                   psi_encoded[int(psi)]=1
+                   coin_dir_encoded = np.zeros(self.closest_coin_dir)
+                   coin_dir = new_state[3]
+                   coin_dir_encoded[int(coin_dir)]=1
+                   new_state_encoded = np.concatenate((coordinates,psi_encoded,coin_dir_encoded))
+                   
+                   # Termination
+                   prob_b = self.pi_b_batch[option](new_state_encoded.reshape(1, self.observation_space_size_encoded)).numpy()
+                   b = np.argmax(prob_b)
+                       
+                   b_tot = np.append(b_tot,b)
+                   if b == 1:
+                       b_bool = True
+                   else:
+                       b_bool = False                
+                    
+                   o_prob_tilde = np.empty((1,self.option_space))
+                   if b_bool == True:
+                       o_prob_tilde = self.pi_hi_batch(new_state_encoded.reshape(1, self.observation_space_size_encoded)).numpy()
+                   else:
+                       o_prob_tilde[0,:] = self.zeta/self.option_space*np.ones((1,self.option_space))
+                       o_prob_tilde[0,option] = 1 - self.zeta + self.zeta/self.option_space
+                   
+                   prob_o = o_prob_tilde
+                   option = np.argmax(prob_o)
+                   o_tot = np.append(o_tot,option)
+                   
+                   # draw next action
+                   prob_u = self.pi_lo_batch[option](new_state_encoded.reshape(1, self.observation_space_size_encoded)).numpy()
+                   new_action = np.argmax(prob_u)
+                   
+                   current_state = new_state
+                   current_state_encoded = new_state_encoded
+                   x = np.append(x, current_state.reshape(1, self.observation_space_size), 0)
+                   current_action = new_action
+                   cum_reward = cum_reward + reward                
+                
+                   
+               reward_per_episode.append(cum_reward)
+               average = np.sum(np.array(reward_per_episode))/(i_episode+1)
+               print("Episode {}: cumulative reward = {}, average = {} (seed = {})".format(i_episode, cum_reward, average, seed))
+               traj[i_episode] = x
+               Option[i_episode] = o_tot
+               Termination[i_episode] = b_tot
+           
+           return traj, Option, Termination, reward_per_episode
  
     
 episode = 496
@@ -290,7 +377,7 @@ NEpisodes = 100
 option_space = 2
 Folders = 6 #[6, 7, 11, 12, 15]
 Rand_traj = 2
-seeds = [13, 29, 33, 36, 27, 21, 15, 31]
+seeds = range(40)
 DeepSoftOC_learning_evaluation = []
 
 for seed in seeds:
@@ -301,5 +388,5 @@ for seed in seeds:
     DeepSoftOC_learning_evaluation.append([traj, Option, Termination, reward_per_episode])
 # %%
 
-with open('RL_algorithms/Option_critic_with_DQN/Results/DeepSoftOC_learning_evaluation.npy', 'wb') as f:
+with open('RL_algorithms/Option_critic_with_DQN/Results/DeepSoftOC_learning_evaluation_40_seeds_4000_steps.npy', 'wb') as f:
     np.save(f, DeepSoftOC_learning_evaluation)

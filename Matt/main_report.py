@@ -28,13 +28,13 @@ import multiprocessing
 import multiprocessing.pool
 
 # %% Preprocessing_data from humans with psi based on the coins clusters distribution  
-Folders = [6] #[6, 7, 11, 12, 15]
+Folders = [6]#[6, 7, 11, 12, 15]
 size_data = 3100
 Rand_traj = 2
 
-TrainingSet, Labels, Trajectories, Rotation, Time, _ = Show_DataSet(Folders, size_data, Rand_traj, 'complete', 'distr_only', 'plot')
+TrainingSet, Labels, Trajectories, Rotation, Time, _ = Show_DataSet(Folders, size_data, Rand_traj, 'complete', 'distr_only', 'no plot')
 # _,_,_,_,_,_ = Show_DataSet(Folders, size_data, Rand_traj, 'simplified', 'distr_only')
-_,_,_,_,_, Reward_eval_human  = Show_DataSet(Folders, size_data, Rand_traj, 'complete', 'full_coins', 'plot')
+_,_,_,_,_, Reward_eval_human  = Show_DataSet(Folders, size_data, Rand_traj, 'complete', 'full_coins', 'no plot')
 # _,_,_,_,_,_  = Show_DataSet(Folders, size_data, Rand_traj, 'simplified', 'full_coins')
 _, _, _, _, _, Reward_training_human = Show_Training(Folders, size_data, Rand_traj, 'complete', 'full_coins', 'no plot')
 
@@ -89,6 +89,11 @@ plt.title('Best Human traj, Reward {}'.format(Reward_eval_human[Rand_traj]))
 plt.savefig('Figures/FiguresExpert/Best_human_traj.eps', format='eps')
 plt.show()  
 
+Average_Human = np.mean(Reward_eval_human)
+Std_Human = np.std(Reward_eval_human)
+Max_Human = np.max(Reward_eval_human)
+Min_Human = np.min(Reward_eval_human)
+
 # %%
 coins_location = World.Foraging.CoinLocation(Folders[0], Rand_traj+1, 'full_coins')
 
@@ -117,9 +122,15 @@ with open('RL_algorithms/DeepQ_Learning/Results/Q_learning_evaluation_results__d
     DQN_Evaluation = np.load(f, allow_pickle=True).tolist()
 
 averageDQN = []
+totRew = []
+MaxDQN = []
+MinDQN = []
 
 for i in range(len(DQN_Evaluation)):
     averageDQN.append(np.mean(DQN_Evaluation[i][0]))
+    totRew.append(DQN_Evaluation[i][0])
+    MaxDQN.append(np.max(DQN_Evaluation[i][0]))
+    MinDQN.append(np.min(DQN_Evaluation[i][0]))
 best_index_agent = np.argmax(averageDQN)
 
 best_reward_index=np.argmax(DQN_Evaluation[best_index_agent][0])
@@ -162,6 +173,13 @@ plt.title('Best DQN Traj, reward {}'.format(DQN_Evaluation[best_index_agent][0][
 plt.savefig('Figures/FiguresDQN/DQN_Traj_example.eps', format='eps')
 plt.show() 
 
+Average_OverSeedsDQN = np.mean(averageDQN)
+TotAve = np.mean(totRew)
+STD = np.std(totRew)
+STD_overSeedDQN = np.std(averageDQN)
+MAX_DQN = np.max(MaxDQN)
+MIN_DQN = np.min(MinDQN)
+
 # %%
 picked_agent = 0
 
@@ -190,7 +208,7 @@ picked_agent = np.argmax(best_reward)
 episodes = np.arange(0,len(Mixture_of_DQN[0][0]))
 z = np.polyfit(episodes, Mixture_of_DQN[int(best_agent[picked_agent])][0], 3)
 p = np.poly1d(z)
-plt.plot(episodes,p(episodes),'k--', label='training trend')
+plt.plot(episodes,p(episodes),'k--')
 plt.plot(episodes, Mixture_of_DQN[int(best_agent[picked_agent])][0],'g', label = 'DQN agent')
 plt.xlabel('Episode')
 plt.ylabel('Reward')
@@ -199,16 +217,24 @@ plt.legend()
 plt.savefig('Figures/FiguresDQN/DQN_training_trend.eps', format='eps')
 plt.show() 
 
+
 #%% Learning from a human Expert Behavioral Cloning
     
 with open('Results_main/BC_from_human_evaluation_results.npy', 'rb') as f:
     BC_from_human_evaluation_results = np.load(f, allow_pickle=True).tolist()
 
 averageBC = []
+BC = []
+maxBC = []
+minBC = []
 
 for i in range(len(BC_from_human_evaluation_results)):
     averageBC.append(np.mean(BC_from_human_evaluation_results[i][0]))
-best_index_agentBC = np.argmax(averageBC)
+    BC.append(BC_from_human_evaluation_results[i][0])
+    maxBC.append(np.max(BC_from_human_evaluation_results[i][0]))
+    minBC.append(np.min(BC_from_human_evaluation_results[i][0]))
+    
+best_index_agentBC = np.argmax(maxBC)
 best_reward_indexBC=np.argmax(BC_from_human_evaluation_results[best_index_agentBC][0])
 best_episodeBC=BC_from_human_evaluation_results[best_index_agentBC][1][best_reward_indexBC]
 
@@ -233,7 +259,7 @@ cbar = fig.colorbar(plot_data, ticks=[10, 100, 200, 300, 400, 500])
 cbar.ax.set_yticklabels(['time = 0', 'time = 100', 'time = 200', 'time = 300', 'time = 400', 'time = 500'])
 plt.xlabel('x')
 plt.ylabel('y')
-plt.title('Best BC Traj, reward {}'.format(best_reward[0]))
+plt.title('Best BC Traj, reward {}'.format(BC_from_human_evaluation_results[best_index_agentBC][0][best_reward_indexBC]))
 plt.savefig('Figures/FiguresBC/BC_from_human_Evaluation.eps', format='eps')
 plt.show() 
 
@@ -248,16 +274,29 @@ plt.ylim([0, 300])
 plt.savefig('Figures/FiguresBC/BC_evaluation_trend.eps', format='eps')
 plt.show() 
 
+Average_OverSeedsBC = np.mean(averageBC)
+BCAve = np.mean(BC)
+STD = np.std(BC)
+STDBC = np.std(averageBC)
+MAXBC = np.max(maxBC)
+MINBC = np.min(minBC)
+
 # %% HIL-preinitialized from human
     
 with open('Results_main/HIL_from_human_evaluation_results.npy', 'rb') as f:
     HIL_from_human_evaluation_results = np.load(f, allow_pickle=True).tolist()
 
 averageHIL = []
+HIL = []
+max_HIL = []
+min_HIL = []
 
 for i in range(len(HIL_from_human_evaluation_results)):
     averageHIL.append(np.mean(HIL_from_human_evaluation_results[i][6]))
-best_index_agentHIL = np.argmax(averageHIL)
+    HIL.append(HIL_from_human_evaluation_results[i][6])
+    max_HIL.append(np.max(HIL_from_human_evaluation_results[i][6]))
+    min_HIL.append(np.min(HIL_from_human_evaluation_results[i][6]))
+best_index_agentHIL = np.argmax(max_HIL)
 best_reward_indexHIL=np.argmax(HIL_from_human_evaluation_results[best_index_agentHIL][6])
 best_episodeHIL=HIL_from_human_evaluation_results[best_index_agentHIL][0][best_reward_indexHIL]
 
@@ -298,7 +337,7 @@ circle3 = plt.Circle((-5, 3), 2*sigma3, color='k',  fill=False)
 sigma4 = 1.3
 circle4 = plt.Circle((4.9, -4), 2*sigma4, color='k',  fill=False)
 fig, ax2 = plt.subplots()
-plot_data = plt.scatter(best_episodeHIL[:,0], best_episodeHIL[:,1], c=Time[0][0:len(best_episode[0])], marker='o', cmap='cool')
+plot_data = plt.scatter(best_episodeHIL[:,0], best_episodeHIL[:,1], c=time, marker='o', cmap='cool')
 plt.plot(0.1*coins_location[:,0], 0.1*coins_location[:,1], 'xk')
 cbar = fig.colorbar(plot_data, ticks=[10, 100, 200, 300, 400, 500])
 cbar.ax.set_yticklabels(['time = 0', 'time = 100', 'time = 200', 'time = 300', 'time = 400', 'time = 500'])
@@ -325,6 +364,12 @@ plt.ylim([0, 300])
 plt.savefig('Figures/FiguresBatch/HIL_evaluation_trend.eps', format='eps')
 plt.show() 
 
+Average_OverSeedsHIL_preinit = np.mean(averageHIL)
+HILAve = np.mean(HIL)
+HILSTD = np.std(HIL)
+STDHIL_pre_Init = np.std(averageHIL)
+MAXHIL_pre_init = np.max(max_HIL)
+MINHIL_pre_init = np.min(min_HIL)
 
 # %% HIL-random initialization from human
 
@@ -332,16 +377,21 @@ with open('Results_main/HIL_from_human_evaluation_results_random_init.npy', 'rb'
     HIL_from_human_evaluation_results_random_init = np.load(f, allow_pickle=True).tolist()
 
 averageHIL_random_init = []
+HILPI = []
+maxHIL_random_init = []
+minHIL_random_init = []
 
 for i in range(len(HIL_from_human_evaluation_results_random_init)):
     averageHIL_random_init.append(np.mean(HIL_from_human_evaluation_results_random_init[i][6]))
-best_index_agentHIL_random_init = np.argmax(averageHIL_random_init)
+    HILPI.append(HIL_from_human_evaluation_results_random_init[i][6])
+    maxHIL_random_init.append(np.max(HIL_from_human_evaluation_results_random_init[i][6]))
+    minHIL_random_init.append(np.min(HIL_from_human_evaluation_results_random_init[i][6]))
+best_index_agentHIL_random_init = np.argmax(maxHIL_random_init)
 best_reward_indexHIL_random_init=np.argmax(HIL_from_human_evaluation_results_random_init[best_index_agentHIL_random_init][6])
 best_episodeHIL_random_init=HIL_from_human_evaluation_results_random_init[best_index_agentHIL_random_init][0][best_reward_indexHIL_random_init]
 
 
 coins_location = World.Foraging.CoinLocation(6, Rand_traj+1, 'full_coins')
-best_index = np.argmax(best_reward)
 
 # Plot result
 sigma1 = 0.5
@@ -405,6 +455,12 @@ plt.ylim([0, 300])
 plt.savefig('Figures/FiguresBatch/HIL_evaluation_trend_random_init.eps', format='eps')
 plt.show() 
 
+Average_OverSeedsHIL_random_init = np.mean(averageHIL_random_init)
+HILPIAve = np.mean(HILPI)
+HILPIStd = np.std(HILPI)
+STDHIL_random_init = np.std(averageHIL_random_init)
+MAXHIL_random_init = np.max(maxHIL_random_init)
+MINHIL_random_init = np.min(minHIL_random_init)
 
 # %% Training Option Critic starting from HIL preinit
 
@@ -494,7 +550,7 @@ plt.show()
 episodes = np.arange(0,len(DeepSoftOC_learning_results[0][0]))
 z = np.polyfit(episodes, DeepSoftOC_learning_results[0][0],4)
 p = np.poly1d(z)
-plt.plot(episodes, p(episodes),'k--', label='Evaluation Trend')
+plt.plot(episodes, p(episodes),'k--')
 plt.plot(episodes, DeepSoftOC_learning_results[0][0], 'g', label = 'OC agent')
 plt.xlabel('Episode')
 plt.ylabel('Reward')
@@ -503,15 +559,22 @@ plt.legend()
 plt.savefig('Figures/FiguresOC/OC_training_trend.eps', format='eps')
 plt.show() 
 
+
 # %% Evaluating Option Critic
 
-with open('RL_algorithms/Option_critic_with_DQN/Results/DeepSoftOC_learning_evaluation.npy', 'rb') as f:
+with open('RL_algorithms/Option_critic_with_DQN/Results/DeepSoftOC_learning_evaluation_40_seeds.npy', 'rb') as f:
     DeepSoftOC_learning_evaluation = np.load(f, allow_pickle=True).tolist()
  
 average_reward = []
+OC = []
+maxOC = []
+minOC = []
 for i in range(len(DeepSoftOC_learning_evaluation)):
     average_reward.append(np.mean(DeepSoftOC_learning_evaluation[i][3]))
-best_index = np.argmax(average_reward)
+    OC.append(DeepSoftOC_learning_evaluation[i][3])
+    maxOC.append(np.max(DeepSoftOC_learning_evaluation[i][3]))
+    minOC.append(np.min(DeepSoftOC_learning_evaluation[i][3]))
+best_index = np.argmax(maxOC)
 best_traj_index = np.argmax(DeepSoftOC_learning_evaluation[best_index][3])
 
 
@@ -580,6 +643,13 @@ plt.legend()
 plt.ylim([0, 300])
 plt.savefig('Figures/FiguresOC/OC_evaluation_trend.eps', format='eps')
 plt.show() 
+
+Average_OverSeedsOC = np.mean(average_reward)
+OCAve = np.mean(OC)
+STDOC = np.std(OC)
+STDOC = np.std(average_reward)
+MAXOC= np.max(maxOC)
+MINOC = np.min(minOC)
 
 # %% Summarizing plot
 with open('RL_algorithms/DeepQ_Learning/Results/Q_learning_evaluation_results__deeper.npy', 'rb') as f:

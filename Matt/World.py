@@ -268,9 +268,14 @@ class Foraging_Training:
             
             # % Simulate dynamics
             Simulated_states = Foraging.StateTransition_simplified(Labels, Training_set_cleaned)
-            see_coin_array, coin_direction_array, reward = Foraging.GeneratePsi(Simulated_states, coin_location, version)            
+            see_coin_array, coin_direction_array, reward = Foraging.GeneratePsi(Simulated_states, coin_location, version)          
+         
+        with open("4_walls_coins_task/FONC_{}_DeID/Behavioral/runNumber{}_master.txt".format(Folder, experiment)) as f:
+            data_raw = f.readlines()
             
-        return Simulated_states, Labels, time_cleaned, see_coin_array, coin_direction_array, reward
+        Real_reward = len(data_raw)
+                    
+        return Simulated_states, Labels, time_cleaned, see_coin_array, coin_direction_array, reward, Real_reward
 
 
 
@@ -345,7 +350,7 @@ class Foraging:
         sim = np.empty((0,2))
         init = original_data[0,:]
         sim = np.append(sim, init.reshape(1,2), 0)
-        for i in range(len(original_actions)):
+        for i in range(min(4000,len(original_actions))): #range(len(original_actions)):
             index = original_actions[i]
             Transition = np.zeros((9,2))
             Transition[0,0] = sim[i,0] + 1
@@ -532,9 +537,14 @@ class Foraging:
             
             # % Simulate dynamics
             Simulated_states = Foraging.StateTransition_simplified(Labels, Training_set_cleaned)
-            see_coin_array, coin_direction_array, reward = Foraging.GeneratePsi(Simulated_states, coin_location, version)            
+            see_coin_array, coin_direction_array, reward = Foraging.GeneratePsi(Simulated_states, coin_location, version)   
+         
+        with open("4_walls_coins_task/FONC_{}_DeID/fMRI/runNumber{}_master.txt".format(Folder, experiment)) as f:
+            data_raw = f.readlines()
             
-        return Simulated_states, Labels, time_cleaned, see_coin_array, coin_direction_array, reward
+        Real_reward = len(data_raw)
+            
+        return Simulated_states, Labels, time_cleaned, see_coin_array, coin_direction_array, reward, Real_reward
     
     
     class env:

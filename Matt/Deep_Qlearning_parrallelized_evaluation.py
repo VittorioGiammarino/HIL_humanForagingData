@@ -43,7 +43,7 @@ for i in range(len(Mixture_of_DQN)):
  
 # %%
 
-coins_location = World.Foraging.CoinLocation(6, 2+1, 'full_coins') #np.random.randint(0,len(Time))
+coins_location = World.Foraging.CoinLocation(15, 9+1, 'full_coins') 
 
 n_episode = 0
 time = np.linspace(0,500,3001)  
@@ -185,9 +185,9 @@ def evaluate(seed, Folders, Rand_traj, NEpisodes, initial_state, net_weights):
 NEpisodes = 100
 Folders = 6 #[6, 7, 11, 12, 15]
 Rand_traj = 2
-Nseed = 40
+Nseed = 20
 
-reset = 'standard'
+reset = 'random'
 initial_state = np.array([0, -2.6, 0, 8])
 Ncpu = len(best_net)*Nseed
 pool = MyPool(Ncpu)
@@ -197,5 +197,5 @@ pool.close()
 pool.join()
 
 # %%
-with open('4_walls_coins_task/Q_learning_evaluation_results__deeper.npy', 'wb') as f:
+with open('RL_algorithms/DeepQ_Learning/Results/Q_learning_evaluation_results_deeper_random_initialization.npy', 'wb') as f:
     np.save(f, Q_learning_evaluation_results)

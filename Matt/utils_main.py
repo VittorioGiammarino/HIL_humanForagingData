@@ -26,9 +26,10 @@ def Show_DataSet(Folders, size_data, Rand_traj, action_space, coins, plot='plot'
     Trajectories = []
     Rotation = []
     Reward = []
+    Real_reward = []
     for folder in Folders:
         for experiment in range(1,11):
-            Training_set_single_traj, Labels_single_traj, Time_single_traj, psi_single_traj, coin_direction_single_traj, reward_single_traj = World.Foraging.ProcessData(folder, experiment, action_space, coins)
+            Training_set_single_traj, Labels_single_traj, Time_single_traj, psi_single_traj, coin_direction_single_traj, reward_single_traj, real_reward = World.Foraging.ProcessData(folder, experiment, action_space, coins)
             Training_set_single_traj_together = np.concatenate((0.1*Training_set_single_traj[0:-1,:], psi_single_traj[0:-1].reshape(len(psi_single_traj[0:-1]),1), coin_direction_single_traj[0:-1].reshape(len(psi_single_traj[0:-1]),1)),1)
             TrainingSet = np.append(TrainingSet, Training_set_single_traj_together, 0)
             Labels = np.append(Labels, Labels_single_traj.reshape(len(Labels_single_traj),1), 0)
@@ -36,6 +37,7 @@ def Show_DataSet(Folders, size_data, Rand_traj, action_space, coins, plot='plot'
             Trajectories.append(Training_set_single_traj_together)
             Rotation.append(Labels_single_traj.reshape(len(Labels_single_traj),1))
             Reward.append(reward_single_traj)
+            Real_reward.append(real_reward)
 
     if plot == 'plot':
         coins_location = World.Foraging.CoinLocation(6, Rand_traj+1, 'full_coins') #np.random.randint(0,len(Time))
@@ -125,7 +127,7 @@ def Show_DataSet(Folders, size_data, Rand_traj, action_space, coins, plot='plot'
         plt.savefig('Figures/FiguresExpert/Expert_Traj_VS_View3D_traj{}_{}_{}.eps'.format(Rand_traj, action_space, coins), format='eps')
         plt.show()
     
-    return TrainingSet, Labels, Trajectories, Rotation, Time, Reward
+    return TrainingSet, Labels, Trajectories, Rotation, Time, Reward, Real_reward
 
 def Show_Training(Folders, size_data, Rand_traj, action_space, coins, plot='plot'):
 # =============================================================================
@@ -140,9 +142,10 @@ def Show_Training(Folders, size_data, Rand_traj, action_space, coins, plot='plot
     Trajectories = []
     Rotation = []
     Reward = []
+    Real_reward = []
     for folder in Folders:
         for experiment in range(1,11):
-            Training_set_single_traj, Labels_single_traj, Time_single_traj, psi_single_traj, coin_direction_single_traj, reward_single_traj = World.Foraging_Training.ProcessData(folder, experiment, action_space, coins)
+            Training_set_single_traj, Labels_single_traj, Time_single_traj, psi_single_traj, coin_direction_single_traj, reward_single_traj, real_reward = World.Foraging_Training.ProcessData(folder, experiment, action_space, coins)
             Training_set_single_traj_together = np.concatenate((0.1*Training_set_single_traj[0:-1,:], psi_single_traj[0:-1].reshape(len(psi_single_traj[0:-1]),1), coin_direction_single_traj[0:-1].reshape(len(psi_single_traj[0:-1]),1)),1)
             TrainingSet = np.append(TrainingSet, Training_set_single_traj_together, 0)
             Labels = np.append(Labels, Labels_single_traj.reshape(len(Labels_single_traj),1), 0)
@@ -150,6 +153,7 @@ def Show_Training(Folders, size_data, Rand_traj, action_space, coins, plot='plot
             Trajectories.append(Training_set_single_traj_together)
             Rotation.append(Labels_single_traj.reshape(len(Labels_single_traj),1))
             Reward.append(reward_single_traj)
+            Real_reward.append(real_reward)
 
     if plot == 'plot':
         coins_location = World.Foraging.CoinLocation(6, Rand_traj+1, 'full_coins') #np.random.randint(0,len(Time))
@@ -239,4 +243,4 @@ def Show_Training(Folders, size_data, Rand_traj, action_space, coins, plot='plot
         plt.savefig('Figures/FiguresExpert/Expert_Traj_VS_View3D_traj{}_{}_{}.eps'.format(Rand_traj, action_space, coins), format='eps')
         plt.show()
     
-    return TrainingSet, Labels, Trajectories, Rotation, Time, Reward
+    return TrainingSet, Labels, Trajectories, Rotation, Time, Reward, Real_reward

@@ -12,22 +12,6 @@ import tensorflow as tf
 from tensorflow import keras
 import tensorflow.keras.backend as kb
 
-def ProcessData(traj,control,psi,stateSpace):
-# =============================================================================
-#     It takes raw data from expert's trajectories, concatenates them together 
-# and return the training data set and the labels
-# =============================================================================
-    Xtr = np.empty((1,0),int)
-    inputs = np.empty((3,0),int)
-
-    for i in range(len(traj)):
-        Xtr = np.append(Xtr, control[i][:])
-        inputs = np.append(inputs, np.transpose(np.concatenate((stateSpace[traj[i][:-1],:], psi[i][:-1].reshape(len(psi[i])-1,1)),1)), axis=1) 
-    
-    labels = Xtr.reshape(len(Xtr),1)
-    TrainingSet = np.transpose(inputs) 
-    
-    return labels, TrainingSet
 
 class NN_PI_LO:
 # =============================================================================
