@@ -20,29 +20,29 @@ class Generalized_Adv_Estimator:
         self.env = World.Foraging.env(Folder, expert_traj)
         np.random.seed(seed)
         self.observation_space_size = self.env.observation_size
-        self.critic = Generalized_Adv_Estimator.NN_model(self)
+        self.critic = Generalized_Adv_Estimator.NN_model(self, seed)
         if import_net:
             self.critic.set_weights(weights)
             
         self.gamma = gamma
         self.lam = lam
             
-def NN_model(input_size, output_size, seed_init):
-    model = keras.Sequential([             
-            keras.layers.Dense(256, activation='relu', input_shape=(input_size,),
-                               kernel_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5, seed=seed_init),
-                               bias_initializer=keras.initializers.Zeros()),        
-            keras.layers.Dense(256, activation='relu', input_shape=(input_size,),
-                               kernel_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5, seed=seed_init),
-                               bias_initializer=keras.initializers.Zeros()),                         
-            keras.layers.Dense(output_size, kernel_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5, seed=seed_init))
-                             ])       
-
-    model.compile(optimizer='adam',
-                       loss=tf.keras.losses.MeanSquaredError(),
-                       metrics=['accuracy'])     
+    def NN_model(self, seed_init):
+        model = keras.Sequential([             
+                keras.layers.Dense(256, activation='relu', input_shape=(self.observation_space_size,),
+                                   kernel_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5, seed=seed_init),
+                                   bias_initializer=keras.initializers.Zeros()),        
+                # keras.layers.Dense(256, activation='relu',
+                #                    kernel_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5, seed=seed_init),
+                #                    bias_initializer=keras.initializers.Zeros()),                         
+                keras.layers.Dense(self.env.action_size, kernel_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5, seed=seed_init))
+                                 ])       
     
-    return model
+        model.compile(optimizer='adam',
+                           loss=tf.keras.losses.MeanSquaredError(),
+                           metrics=['accuracy'])     
+        
+        return model
     
     def discounted_sum(x,rate):
         return sp_sig.lfilter([1], [1, float(-rate)], x[::-1], axis=0)[::-1]
@@ -119,7 +119,7 @@ for i in range(len(Mixture_of_DQN)):
                 best_net[k]=Mixture_of_DQN[i][2][j]
                 break    
     
-NEpisodes = 100
+NEpisodes = 1
 best_index = 0 #np.argmax(best_reward) 
 Folders = 6 #[6, 7, 11, 12, 15]
 Rand_traj = 2
@@ -133,7 +133,7 @@ GAE = Generalized_Adv_Estimator(seed, Folders, Rand_traj, gamma, lam, import_net
 
 cum_reward = 0
 for i in range(NEpisodes):
-    adv, rtg, traj, control, reward = GAE.Runner(initial_state)
+    adv, rtg, traj, control, reward = GAE.Runner(initial_state, T=6000)
     cum_reward = cum_reward + np.sum(reward)
     average = (cum_reward)/(i+1)
     print("GAE: cumulative reward = {}, average = {}".format(np.sum(reward), average))

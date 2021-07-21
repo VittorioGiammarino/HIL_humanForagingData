@@ -17,36 +17,40 @@ from tensorflow import keras
 import multiprocessing
 import multiprocessing.pool
 
-with open('RL_algorithms/DeepQ_Learning/Results/Q_learning_results_deeper.npy', 'rb') as f:
+with open('RL_algorithms/DeepQ_Learning/Results/Q_learning_results_500steps.npy', 'rb') as f:
     Mixture_of_DQN = np.load(f, allow_pickle=True).tolist()
     
 # %%
 
-N_agents = 1
+N_agents = 10
 
 best_reward = np.zeros(N_agents)
 best_episode = [[None]*1 for _ in range(N_agents)]
 best_agent = np.zeros(N_agents)
 best_net = [[None]*1 for _ in range(N_agents)]
+best_episode_N = np.zeros(N_agents)
 
 for i in range(len(Mixture_of_DQN)):
     for j in range(len(Mixture_of_DQN[i][0])):
         temp = Mixture_of_DQN[i][0][j]
+        k = np.argmin(best_reward)
         
-        for k in range(N_agents):
-            if temp>best_reward[k]:
-                best_reward[k]=Mixture_of_DQN[i][0][j]
-                best_episode[k]=Mixture_of_DQN[i][1][j]
-                best_agent[k]=i
-                best_net[k]=Mixture_of_DQN[i][2][j]
-                break
- 
+        if temp>best_reward[k]:
+            best_reward[k]=Mixture_of_DQN[i][0][j]
+            best_episode[k]=Mixture_of_DQN[i][1][j]
+            best_agent[k]=i
+            best_net[k]=Mixture_of_DQN[i][2][j]
+            best_episode_N[k]=j
+            
+with open('RL_algorithms/DeepQ_Learning/Results/Q_learning_best_net_500_steps.npy', 'wb') as f:
+    np.save(f, best_net[2])
+     
 # %%
 
-coins_location = World.Foraging.CoinLocation(15, 9+1, 'full_coins') 
+coins_location = World.Foraging.CoinLocation(6, 2+1, 'full_coins') 
 
-n_episode = 0
-time = np.linspace(0,500,3001)  
+n_episode = np.argmax(best_reward)
+time = np.linspace(0,500,len(best_episode[n_episode][:,0]))  
  
 sigma1 = 0.5
 circle1 = ptch.Circle((6.0, 7.5), 2*sigma1, color='k',  fill=False)
@@ -154,7 +158,7 @@ class Q_learning_NN:
             cum_reward = 0 
             x = np.append(x, current_state.reshape(1, self.observation_space_size), 0)
             
-            for t in range(3000):
+            for t in range(6000):
                 # env.render()
                 mean = np.argmax(self.Q_network(current_state.reshape(1,len(current_state))))
                 
@@ -182,19 +186,27 @@ def evaluate(seed, Folders, Rand_traj, NEpisodes, initial_state, net_weights):
     
     return reward_per_episode, traj, network_weights
 
-NEpisodes = 100
+NEpisodes = 10
 Folders = 6 #[6, 7, 11, 12, 15]
 Rand_traj = 2
-Nseed = 20
+Nseed = 4
+net_weights = best_net[2] 
 
-reset = 'random'
+reset = 'standard'
 initial_state = np.array([0, -2.6, 0, 8])
 Ncpu = len(best_net)*Nseed
 pool = MyPool(Ncpu)
-args = [(seed, Folders, Rand_traj, NEpisodes, initial_state, net_weights) for net_weights in best_net for seed in range(Nseed)]
+args = [(seed, Folders, Rand_traj, NEpisodes, initial_state, net_weights) for seed in range(Nseed)]
 Q_learning_evaluation_results = pool.starmap(evaluate, args) 
 pool.close()
 pool.join()
+
+# %%
+mean = []
+for i in range(len(Q_learning_evaluation_results)):
+    mean.append(np.mean(Q_learning_evaluation_results[i][0]))
+    
+ave = np.mean(mean)
 
 # %%
 with open('RL_algorithms/DeepQ_Learning/Results/Q_learning_evaluation_results_deeper_random_initialization.npy', 'wb') as f:

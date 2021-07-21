@@ -18,7 +18,7 @@ import multiprocessing
 import multiprocessing.pool
 import BatchBW_HIL
 
-with open('RL_algorithms/Option_critic_with_DQN/Results/DeepSoftOC_learning_results_second_attempt.npy', 'rb') as f:
+with open('RL_algorithms/Option_critic_with_DQN/Results/DeepSoftOC_learning_results_5th_attempt.npy', 'rb') as f:
     DeepSoftOC_learning_results = np.load(f, allow_pickle=True).tolist()
     
 # %%
@@ -56,7 +56,7 @@ coins_location = World.Foraging.CoinLocation(6, 2+1, 'full_coins') #np.random.ra
 
 best = np.argmax(best_reward)
 n_episode = best
-time = np.linspace(0,500,3001)  
+time = np.linspace(0,500,len(best_traj[n_episode][:,0]))  
  
 sigma1 = 0.5
 circle1 = ptch.Circle((6.0, 7.5), 2*sigma1, color='k',  fill=False)
@@ -201,7 +201,7 @@ class Option_Critic_with_DQN_eval:
             draw_u=np.divide(np.random.rand(),np.amin(prob_u)+0.01)
             current_action = np.amin(np.where(draw_u<prob_u_rescaled)[1])
             
-            for t in range(4000):
+            for t in range(8000):
                 
                 obs, reward = self.env.step(current_action)
                 new_state = obs
@@ -371,13 +371,13 @@ class Option_Critic_with_DQN_eval:
     
 episode = 496
 
-best = 0 #np.argmax(best_reward) # best agent is number 0 which had a reward of 245 and was at iteration 428
+best = 3 #np.argmax(best_reward) # best agent is number 0 which had a reward of 245 and was at iteration 428
    
 NEpisodes = 100
 option_space = 2
 Folders = 6 #[6, 7, 11, 12, 15]
 Rand_traj = 2
-seeds = range(40)
+seeds = range(1)
 DeepSoftOC_learning_evaluation = []
 
 for seed in seeds:
@@ -388,5 +388,5 @@ for seed in seeds:
     DeepSoftOC_learning_evaluation.append([traj, Option, Termination, reward_per_episode])
 # %%
 
-with open('RL_algorithms/Option_critic_with_DQN/Results/DeepSoftOC_learning_evaluation_40_seeds_4000_steps.npy', 'wb') as f:
+with open('RL_algorithms/Option_critic_with_DQN/Results/DeepSoftOC_learning_evaluation_3rd_attempt_8000_steps.npy', 'wb') as f:
     np.save(f, DeepSoftOC_learning_evaluation)

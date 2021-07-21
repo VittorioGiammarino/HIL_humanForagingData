@@ -21,47 +21,23 @@ import multiprocessing
 import multiprocessing.pool
 
 # %% Preprocessing_data from humans with psi based on the coins clusters distribution  
-Folders = [6] #[6, 7, 11, 12, 15]
-size_data = 3100
-Rand_traj = 2
+Folders = [6, 7, 11, 12, 15]
 
-TrainingSet, Labels, Trajectories, Rotation, Time, _, _ = Show_DataSet(Folders, size_data, Rand_traj, 'complete', 'distr_only', 'plot')
-# _,_,_,_,_,_ = Show_DataSet(Folders, size_data, Rand_traj, 'simplified', 'distr_only')
-_,_,_,_,_, Reward_eval_human, Real_Reward_eval_human  = Show_DataSet(Folders, size_data, Rand_traj, 'complete', 'full_coins', 'no plot')
-# _,_,_,_,_,_  = Show_DataSet(Folders, size_data, Rand_traj, 'simplified', 'full_coins')
-_, _, _, _, _, Reward_training_human, Real_Reward_training_human = Show_Training(Folders, size_data, Rand_traj, 'complete', 'full_coins', 'no plot')
-
+TrainingSet, Labels, Trajectories, Rotation, Time, _, _, _, _ = Show_DataSet(Folders, 'complete', 'distr_only')
+_,_,_,_,_, Reward_eval_human, Real_Traj_eval_human, Real_Reward_eval_human, Real_Time_eval_human = Show_DataSet(Folders, 'complete', 'full_coins')
+_, _, _, _, _, Reward_training_human, Real_Traj_training_human, Real_Reward_training_human, Real_Time_training_human = Show_Training(Folders, 'complete', 'full_coins')
 
 # %% Plot human expert
 
-np.mean(Real_Reward_eval_human)
-np.mean(Real_Reward_training_human)
+threshold = np.mean(Real_Reward_eval_human)
+performance_training = np.mean(Real_Reward_training_human)
+Rand_traj = 2
+# Rand_traj = np.argmax(Real_Reward_eval_human)
+size_data = len(Trajectories[Rand_traj])
 
-# Plot Human Day 1
-episodes = np.arange(0,len(Reward_eval_human))
-plt.plot(episodes, np.ones(len(episodes))*np.mean(Reward_eval_human),'k--')
-plt.plot(episodes, Reward_eval_human,'g', label = 'human agent evaluation (mean = {})'.format(np.mean(Reward_eval_human)))
-plt.xlabel('Episode')
-plt.ylabel('Reward')
-plt.title('Human agent performance Day 2')
-plt.legend()
-plt.ylim([0, 300])
-plt.savefig('Figures/FiguresExpert/Human_Reward.eps', format='eps')
-plt.show() 
-
-# Plot Human Day 2
-episodes = np.arange(0,len(Reward_training_human))
-plt.plot(episodes, np.ones(len(episodes))*np.mean(Reward_training_human),'k--')
-plt.plot(episodes, Reward_training_human,'g', label = 'human agent evaluation (mean = {})'.format(np.mean(Reward_training_human)))
-plt.xlabel('Episode')
-plt.ylabel('Reward')
-plt.title('Human agent performance Day 1')
-plt.legend()
-plt.ylim([0, 300])
-plt.savefig('Figures/FiguresExpert/Human_Reward_training.eps', format='eps')
-plt.show() 
-
-coins_location = World.Foraging.CoinLocation(Folders[0], Rand_traj+1, 'full_coins')
+nTraj = Rand_traj%10
+folder = Folders[int(Rand_traj/10)]
+coins_location = World.Foraging.CoinLocation(folder, nTraj+1, 'full_coins')
 
 sigma1 = 0.5
 circle1 = ptch.Circle((6, 7.5), 2*sigma1, color='k',  fill=False)
@@ -82,10 +58,57 @@ cbar = fig.colorbar(plot_data, ticks=[10, 100, 200, 300, 400, 500])
 cbar.ax.set_yticklabels(['time = 0', 'time = 100', 'time = 200', 'time = 300', 'time = 400', 'time = 500'])
 plt.xlabel('x')
 plt.ylabel('y')
-plt.title('Best Human traj, Reward {}'.format(Reward_eval_human[Rand_traj]))
-plt.savefig('Figures/FiguresExpert/Best_human_traj.eps', format='eps')
+plt.title('Human Agent, Reward {}'.format(Reward_eval_human[Rand_traj]))
+plt.savefig('Figures/FiguresExpert/Processed_human_traj.eps', format='eps')
 plt.show()  
 
+time = np.linspace(0,480,len(Real_Traj_eval_human[Rand_traj][:,0])) 
+
+sigma1 = 0.5
+circle1 = ptch.Circle((6, 7.5), 2*sigma1, color='k',  fill=False)
+sigma2 = 1.1
+circle2 = ptch.Circle((-1.5, -5), 2*sigma2, color='k',  fill=False)
+sigma3 = 1.8
+circle3 = ptch.Circle((-5, 3), 2*sigma3, color='k',  fill=False)
+sigma4 = 1.3
+circle4 = ptch.Circle((4.9, -4), 2*sigma4, color='k',  fill=False)
+fig, ax = plt.subplots()
+ax.add_artist(circle1)
+ax.add_artist(circle2)
+ax.add_artist(circle3)
+ax.add_artist(circle4)
+plot_data = plt.scatter(0.1*Real_Traj_eval_human[Rand_traj][:,0], 0.1*Real_Traj_eval_human[Rand_traj][:,1], c=time, marker='o', cmap='cool') #-1], marker='o', cmap='cool')
+plt.plot(0.1*coins_location[:,0], 0.1*coins_location[:,1], 'xb')
+cbar = fig.colorbar(plot_data, ticks=[10, 100, 200, 300, 400, 500])
+cbar.ax.set_yticklabels(['time = 0', 'time = 100', 'time = 200', 'time = 300', 'time = 400', 'time = 500'])
+plt.xlabel('x')
+plt.ylabel('y')
+plt.title('Human Agent, Reward {}'.format(Real_Reward_eval_human[Rand_traj]))
+plt.savefig('Figures/FiguresExpert/Real_human_traj{}.eps'.format(Rand_traj), format='eps')
+plt.show() 
+
+sigma1 = 0.5
+circle1 = plt.Circle((6, 7.5), 2*sigma1, color='k',  fill=False)
+sigma2 = 1.1
+circle2 = plt.Circle((-1.5, -5), 2*sigma2, color='k',  fill=False)
+sigma3 = 1.8
+circle3 = plt.Circle((-5, 3), 2*sigma3, color='k',  fill=False)
+sigma4 = 1.3
+circle4 = plt.Circle((4.9, -4), 2*sigma4, color='k',  fill=False)
+fig3, ax3 = plt.subplots()
+plot_data = plt.scatter(Trajectories[2][:,0], Trajectories[2][:,1], c=Trajectories[2][:,2], marker='o', cmap='bwr')
+plt.plot(0.1*coins_location[:,0], 0.1*coins_location[:,1], 'xk')
+cbar = fig3.colorbar(plot_data, ticks=[0, 1])
+cbar.ax.set_yticklabels(['no coins', 'see coins'])
+ax3.add_artist(circle1)
+ax3.add_artist(circle2)
+ax3.add_artist(circle3)
+ax3.add_artist(circle4)
+plt.xlabel('x')
+plt.ylabel('y')
+# plt.title('Options, action space {}, coins {}'.format(action_space, coins))
+plt.savefig('Figures/FiguresExpert/Expert_Traj_VS_View.eps', format='eps')
+plt.show()   
 
 # %%
 coins_location = World.Foraging.CoinLocation(Folders[0], Rand_traj+1, 'full_coins')
@@ -111,32 +134,26 @@ plt.show()
 
 # %% 
 Folders = [6]
+Rand_traj = 2
+
 with open('RL_algorithms/DeepQ_Learning/Results/Q_learning_evaluation_results__deeper.npy', 'rb') as f:
     DQN_Evaluation = np.load(f, allow_pickle=True).tolist()
 
 averageDQN = []
+MaxDQN = []
 
 for i in range(len(DQN_Evaluation)):
     averageDQN.append(np.mean(DQN_Evaluation[i][0]))
-best_index_agent = np.argmax(averageDQN)
+    MaxDQN.append(np.max(DQN_Evaluation[i][0]))
+best_index_agent = np.argmax(MaxDQN)
 
 best_reward_index=np.argmax(DQN_Evaluation[best_index_agent][0])
 best_episode=DQN_Evaluation[best_index_agent][1][best_reward_index]
 
-episodes = np.arange(0,len(DQN_Evaluation[best_index_agent][0]))
-plt.plot(episodes,np.ones(len(episodes))*np.mean(DQN_Evaluation[best_index_agent][0]),'k--')
-plt.plot(episodes, DQN_Evaluation[best_index_agent][0],'g', label = 'DQN agent (mean = {})'.format(np.mean(DQN_Evaluation[best_index_agent][0])))
-plt.xlabel('Episode')
-plt.ylabel('Reward')
-plt.title('Evaluation DQN')
-plt.legend()
-plt.ylim([0, 300])
-plt.savefig('Figures/FiguresDQN/DQN_evaluation.eps', format='eps')
-plt.show() 
 
 coins_location = World.Foraging.CoinLocation(Folders[0], Rand_traj+1, 'full_coins') #np.random.randint(0,len(Time))
 
-time = np.linspace(0,480,3001)  
+time = np.linspace(0,480,len(best_episode[:,0]))  
 sigma1 = 0.5
 circle1 = ptch.Circle((6.0, 7.5), 2*sigma1, color='k',  fill=False)
 sigma2 = 1.1
@@ -156,14 +173,14 @@ cbar = fig.colorbar(plot_data, ticks=[10, 100, 200, 300, 400, 500])
 cbar.ax.set_yticklabels(['time = 0', 'time = 100', 'time = 200', 'time = 300', 'time = 400', 'time = 500'])
 plt.xlabel('x')
 plt.ylabel('y')
-plt.title('Best DQN Traj, reward {}'.format(DQN_Evaluation[best_index_agent][0][best_reward_index]))
+plt.title('DQN Agent, reward {}'.format(DQN_Evaluation[best_index_agent][0][best_reward_index]))
 plt.savefig('Figures/FiguresDQN/DQN_Traj_example.eps', format='eps')
 plt.show() 
 
 # %%
 picked_agent = 0
 
-with open('RL_algorithms/DeepQ_Learning/Results/Q_learning_results_deeper.npy', 'rb') as f:
+with open('RL_algorithms/DeepQ_Learning/Results/Q_learning_results_500steps.npy', 'rb') as f:
     Mixture_of_DQN = np.load(f, allow_pickle=True).tolist()
 
 N_agents = 10
@@ -186,15 +203,24 @@ for i in range(len(Mixture_of_DQN)):
 picked_agent = np.argmax(best_reward)
 
 episodes = np.arange(0,len(Mixture_of_DQN[0][0]))
-z = np.polyfit(episodes, Mixture_of_DQN[int(best_agent[picked_agent])][0], 3)
+z = np.polyfit(episodes, Mixture_of_DQN[int(best_agent[picked_agent])][0], 100)
 p = np.poly1d(z)
-plt.plot(episodes,p(episodes),'k--', label='training trend')
+plt.plot(episodes,p(episodes),'g', label = 'DQN agent')
+#plt.plot(episodes, Mixture_of_DQN[int(best_agent[picked_agent])][0],'g', label = 'DQN agent')
+plt.xlabel('Episode')
+plt.ylabel('Reward')
+plt.title('Training DQN')
+plt.legend()
+plt.savefig('Figures/FiguresDQN/DQN_training_trend_smoothed.eps', format='eps')
+plt.show() 
+
+
 plt.plot(episodes, Mixture_of_DQN[int(best_agent[picked_agent])][0],'g', label = 'DQN agent')
 plt.xlabel('Episode')
 plt.ylabel('Reward')
 plt.title('Training DQN')
 plt.legend()
-plt.savefig('Figures/FiguresDQN/DQN_training_trend.eps', format='eps')
+plt.savefig('Figures/FiguresDQN/DQN_training_trend_unsmoothed.eps', format='eps')
 plt.show() 
 
 #%% Learning from a human Expert
@@ -336,10 +362,12 @@ with open('Results_main/BC_from_human_evaluation_results.npy', 'rb') as f:
     BC_from_human_evaluation_results = np.load(f, allow_pickle=True).tolist()
 
 averageBC = []
+MaxBC = []
 
 for i in range(len(BC_from_human_evaluation_results)):
     averageBC.append(np.mean(BC_from_human_evaluation_results[i][0]))
-best_index_agentBC = np.argmax(averageBC)
+    MaxBC.append(np.max(BC_from_human_evaluation_results[i][0]))
+best_index_agentBC = np.argmax(MaxBC)
 best_reward_indexBC=np.argmax(BC_from_human_evaluation_results[best_index_agentBC][0])
 best_episodeBC=BC_from_human_evaluation_results[best_index_agentBC][1][best_reward_indexBC]
 
@@ -364,7 +392,7 @@ cbar = fig.colorbar(plot_data, ticks=[10, 100, 200, 300, 400, 500])
 cbar.ax.set_yticklabels(['time = 0', 'time = 100', 'time = 200', 'time = 300', 'time = 400', 'time = 500'])
 plt.xlabel('x')
 plt.ylabel('y')
-plt.title('Best BC Traj, reward {}'.format(best_reward[0]))
+plt.title('BC Agent, reward {}'.format(BC_from_human_evaluation_results[best_index_agentBC][0][best_reward_indexBC]))
 plt.savefig('Figures/FiguresBC/BC_from_human_Evaluation.eps', format='eps')
 plt.show() 
 
@@ -408,7 +436,6 @@ options_predictions = pi_hi_model.predict(T_set)
 
 # %% Training single trajectory pre initialized batch
 Likelihood_batch_list = []
-Rand_traj = 2
 size_data = len(Trajectories[Rand_traj])-1
 T_set = Trajectories[Rand_traj][0:size_data,:]
 # encode psi
@@ -437,12 +464,12 @@ Likelihood_batch_list.append(likelihood)
 # BatchSim = World.Simulation_NN(pi_hi_batch, pi_lo_batch, pi_b_batch)
 # [trajBatch, controlBatch, OptionsBatch, TerminationBatch, psiBatch, coin_directionBatch, rewardBatch] = BatchSim.HierarchicalStochasticSampleTrajMDP(seed, 3000, 1, initial_state[0:2], Folders[0], Rand_traj)
 
-# %%
-# BatchBW_HIL.NN_PI_HI.save(pi_hi_batch, 'Models/Saved_Model_Batch/pi_hi_NN_preinit')
-# for i in range(option_space):
-#     BatchBW_HIL.NN_PI_LO.save(pi_lo_batch[i], 'Models/Saved_Model_Batch/pi_lo_NN_{}_pi_hi_NN_preinit'.format(i))
-#     BatchBW_HIL.NN_PI_B.save(pi_b_batch[i], 'Models/Saved_Model_Batch/pi_b_NN_{}_pi_hi_NN_preinit'.format(i))
-# %
+#%%
+BatchBW_HIL.NN_PI_HI.save(pi_hi_batch, 'Models/Saved_Model_Batch/pi_hi_NN_preinit_new')
+for i in range(option_space):
+    BatchBW_HIL.NN_PI_LO.save(pi_lo_batch[i], 'Models/Saved_Model_Batch/pi_lo_NN_{}_pi_hi_NN_preinit_new'.format(i))
+    BatchBW_HIL.NN_PI_B.save(pi_b_batch[i], 'Models/Saved_Model_Batch/pi_b_NN_{}_pi_hi_NN_preinit_new'.format(i))
+#%
 # %% Online BW for HIL
 Rand_traj = 2
 size_data = len(Trajectories[Rand_traj])-1
@@ -473,6 +500,14 @@ for i in range(option_space):
     OnlineBW_HIL.NN_PI_B.save(pi_b_online[i], 'Models/Saved_Model_Online/pi_b_NN_{}_online_preinit'.format(i))
 
 # %%
+
+# pi_hi_batch = BatchBW_HIL.NN_PI_HI.load('Models/Saved_Model_Batch/pi_hi_NN_preinit_new')
+# pi_lo_batch = []
+# pi_b_batch = []
+# option_space = 2
+# for i in range(option_space):
+#     pi_lo_batch.append(BatchBW_HIL.NN_PI_LO.load('Models/Saved_Model_Batch/pi_lo_NN_{}_pi_hi_NN_preinit_new'.format(i)))
+#     pi_b_batch.append(BatchBW_HIL.NN_PI_B.load('Models/Saved_Model_Batch/pi_b_NN_{}_pi_hi_NN_preinit_new'.format(i)))
 
 pi_hi_batch = BatchBW_HIL.NN_PI_HI.load('Models/Saved_Model_Batch/pi_hi_NN_preinit')
 pi_lo_batch = []
@@ -515,27 +550,34 @@ def evaluateHIL_fromHuman(seed, Folder, Rand_traj, NEpisodes, initial_state, pi_
     pi_b_batch.append(pi_b2_model)
     
     BatchSim = World.Simulation_NN(pi_hi_batch, pi_lo_batch, pi_b_batch)
-    [trajBatch, controlBatch, OptionsBatch, TerminationBatch, psiBatch, coin_directionBatch, rewardBatch] = BatchSim.HierarchicalStochasticSampleTrajMDP(seed, 3000, NEpisodes, initial_state[0:2], Folder, Rand_traj)
+    [trajBatch, controlBatch, OptionsBatch, TerminationBatch, psiBatch, coin_directionBatch, rewardBatch] = BatchSim.HierarchicalStochasticSampleTrajMDP(seed, 6000, NEpisodes, initial_state[0:2], Folder, Rand_traj)
         
     return trajBatch, controlBatch, OptionsBatch, TerminationBatch, psiBatch, coin_directionBatch, rewardBatch
     
-NEpisodes = 100
-Nseed=40
+
+# initial_state = np.array([0, -2.6, 0, 8])#Trajectories[Rand_traj][0,:]
+# folder = 6
+# nTraj = 2
+
+NEpisodes = 10
+Nseed = multiprocessing.cpu_count()
 initial_state = Trajectories[Rand_traj][0,:]
 Ncpu = Nseed
 pool = MyPool(Ncpu)
-args = [(seed, Folders[0], Rand_traj, NEpisodes, initial_state, pi_hi_batch.get_weights(), pi_lo_batch[0].get_weights(), pi_lo_batch[1].get_weights(), pi_b_batch[0].get_weights(), pi_b_batch[1].get_weights()) for seed in range(Nseed)]
+args = [(seed, folder, nTraj, NEpisodes, initial_state, pi_hi_batch.get_weights(), pi_lo_batch[0].get_weights(), pi_lo_batch[1].get_weights(), pi_b_batch[0].get_weights(), pi_b_batch[1].get_weights()) for seed in range(Nseed)]
 HIL_from_human_evaluation_results = pool.starmap(evaluateHIL_fromHuman, args) 
 pool.close()
 pool.join()
+
+
 
 # %%
 
 # with open('4_walls_coins_task/HIL_from_human_evaluation_results.npy', 'wb') as f:
 #     np.save(f, HIL_from_human_evaluation_results)
     
-with open('Results_main/HIL_from_human_evaluation_results.npy', 'rb') as f:
-    HIL_from_human_evaluation_results = np.load(f, allow_pickle=True).tolist()
+# with open('Results_main/HIL_from_human_evaluation_results.npy', 'rb') as f:
+#     HIL_from_human_evaluation_results = np.load(f, allow_pickle=True).tolist()
 
 averageHIL = []
 
@@ -545,7 +587,8 @@ best_index_agentHIL = np.argmax(averageHIL)
 best_reward_indexHIL=np.argmax(HIL_from_human_evaluation_results[best_index_agentHIL][6])
 best_episodeHIL=HIL_from_human_evaluation_results[best_index_agentHIL][0][best_reward_indexHIL]
 
-coins_location = World.Foraging.CoinLocation(6, Rand_traj+1, 'full_coins')
+coins_location = World.Foraging.CoinLocation(folder, nTraj+1, 'full_coins')
+time = np.linspace(0,480,len(best_episodeHIL)) 
 
 # Plot result
 sigma1 = 0.5
@@ -582,7 +625,7 @@ circle3 = plt.Circle((-5, 3), 2*sigma3, color='k',  fill=False)
 sigma4 = 1.3
 circle4 = plt.Circle((4.9, -4), 2*sigma4, color='k',  fill=False)
 fig, ax2 = plt.subplots()
-plot_data = plt.scatter(best_episodeHIL[:,0], best_episodeHIL[:,1], c=Time[0][0:len(best_episode[0])], marker='o', cmap='cool')
+plot_data = plt.scatter(best_episodeHIL[:,0], best_episodeHIL[:,1], c=time, marker='o', cmap='cool')
 plt.plot(0.1*coins_location[:,0], 0.1*coins_location[:,1], 'xk')
 cbar = fig.colorbar(plot_data, ticks=[10, 100, 200, 300, 400, 500])
 cbar.ax.set_yticklabels(['time = 0', 'time = 100', 'time = 200', 'time = 300', 'time = 400', 'time = 500'])
@@ -793,7 +836,7 @@ plt.show()
 
 # %% Training Option Critic
 
-with open('RL_algorithms/Option_critic_with_DQN/Results/DeepSoftOC_learning_results_second_attempt.npy', 'rb') as f:
+with open('RL_algorithms/Option_critic_with_DQN/Results/DeepSoftOC_learning_results_4th_attempt.npy', 'rb') as f:
     DeepSoftOC_learning_results = np.load(f, allow_pickle=True).tolist()
     
 N_agents = 10
@@ -826,7 +869,7 @@ coins_location = World.Foraging.CoinLocation(6, 2+1, 'full_coins') #np.random.ra
 
 best_index = np.argmax(best_reward)
 n_episode = best_index
-time = np.linspace(0,480,3001)  
+time = np.linspace(0,480,len(best_traj[n_episode][:,0]))  
  
 sigma1 = 0.5
 circle1 = ptch.Circle((6.0, 7.5), 2*sigma1, color='k',  fill=False)
@@ -877,10 +920,10 @@ plt.savefig('Figures/FiguresOC/OC_Traj_VS_Options_traj_reward{}.eps'.format(best
 plt.show()  
 
 episodes = np.arange(0,len(DeepSoftOC_learning_results[0][0]))
-z = np.polyfit(episodes, DeepSoftOC_learning_results[0][0],4)
+z = np.polyfit(episodes, DeepSoftOC_learning_results[0][0],10)
 p = np.poly1d(z)
 plt.plot(episodes, p(episodes),'k--', label='Evaluation Trend')
-plt.plot(episodes, DeepSoftOC_learning_results[0][0], 'g', label = 'OC agent')
+#plt.plot(episodes, DeepSoftOC_learning_results[0][0], 'g', label = 'OC agent')
 plt.xlabel('Episode')
 plt.ylabel('Reward')
 plt.title('Training OC')
@@ -890,7 +933,7 @@ plt.show()
 
 # %% Evaluating Option Critic
 
-with open('RL_algorithms/Option_critic_with_DQN/Results/DeepSoftOC_learning_evaluation.npy', 'rb') as f:
+with open('RL_algorithms/Option_critic_with_DQN/Results/DeepSoftOC_learning_evaluation_4th_attempt_8000_steps.npy', 'rb') as f:
     DeepSoftOC_learning_evaluation = np.load(f, allow_pickle=True).tolist()
  
 average_reward = []
@@ -901,6 +944,7 @@ best_traj_index = np.argmax(DeepSoftOC_learning_evaluation[best_index][3])
 
 
 coins_location = World.Foraging.CoinLocation(6, Rand_traj+1, 'full_coins')
+time = np.linspace(0,480,len(DeepSoftOC_learning_evaluation[best_index][0][best_traj_index][:,0]))  
 
 # Plot result
 sigma1 = 0.5

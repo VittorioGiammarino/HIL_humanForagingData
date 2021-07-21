@@ -207,17 +207,20 @@ class Foraging_Training:
 
         agent_data = csv.reader(data_raw)
         Training_set = np.empty((0,2))
+        True_set = np.empty((0,2))
         time = np.empty((0,1))
 
         for row in agent_data:
+            True_set = np.append(True_set, np.array([[float(row[0]), float(row[2])]]), 0)
             Training_set = np.append(Training_set, np.array([[np.round(float(row[0])), np.round(float(row[2]))]]), 0)
             time = np.append(time, float(row[3]))    
             
         State_space, Training_set_index = np.unique(Training_set, return_index=True, axis = 0)    
         Training_set_cleaned = Training_set[np.sort(Training_set_index),:]
         time_cleaned = time[np.sort(Training_set_index)]
+        True_Training_set = True_set
         
-        return Training_set_cleaned, time_cleaned
+        return True_Training_set, Training_set_cleaned, time_cleaned
             
         
     def ProcessData(Folder, experiment, version, coins = 'full_coins'):
@@ -280,7 +283,6 @@ class Foraging_Training:
 
 
 class Foraging:    
-
     def TransitionCheck4Labels_simplified(state,state_next):
         Transition = np.zeros((4,2))
         Transition[0,0] = state[0] + 1
@@ -350,7 +352,7 @@ class Foraging:
         sim = np.empty((0,2))
         init = original_data[0,:]
         sim = np.append(sim, init.reshape(1,2), 0)
-        for i in range(min(4000,len(original_actions))): #range(len(original_actions)):
+        for i in range(len(original_actions)): #range(len(original_actions)):
             index = original_actions[i]
             Transition = np.zeros((9,2))
             Transition[0,0] = sim[i,0] + 1
@@ -476,17 +478,20 @@ class Foraging:
 
         agent_data = csv.reader(data_raw)
         Training_set = np.empty((0,2))
+        True_set = np.empty((0,2))
         time = np.empty((0,1))
 
         for row in agent_data:
+            True_set = np.append(True_set, np.array([[float(row[0]), float(row[2])]]), 0)
             Training_set = np.append(Training_set, np.array([[np.round(float(row[0])), np.round(float(row[2]))]]), 0)
             time = np.append(time, float(row[3]))    
             
         State_space, Training_set_index = np.unique(Training_set, return_index=True, axis = 0)    
         Training_set_cleaned = Training_set[np.sort(Training_set_index),:]
         time_cleaned = time[np.sort(Training_set_index)]
+        True_Training_set = True_set
         
-        return Training_set_cleaned, time_cleaned
+        return True_Training_set, Training_set_cleaned, time_cleaned
             
         
     def ProcessData(Folder, experiment, version, coins = 'full_coins'):
@@ -508,7 +513,7 @@ class Foraging:
             Training_set = np.append(Training_set, np.array([[np.round(float(row[0])), np.round(float(row[2]))]]), 0)
             time = np.append(time, float(row[3]))
     
-        State_space, Training_set_index = np.unique(Training_set, return_index=True, axis = 0)    
+        State_space, Training_set_index = np.unique(Training_set, return_index=True, axis=0)    
         Training_set_cleaned = Training_set[np.sort(Training_set_index),:]
         time_cleaned = time[np.sort(Training_set_index)]
 
