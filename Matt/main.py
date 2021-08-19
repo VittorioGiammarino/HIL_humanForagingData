@@ -180,7 +180,7 @@ plt.show()
 # %%
 picked_agent = 0
 
-with open('RL_algorithms/DeepQ_Learning/Results/Q_learning_results_500steps.npy', 'rb') as f:
+with open('RL_algorithms/DeepQ_Learning/Results/Q_learning_results_deeper.npy', 'rb') as f:
     Mixture_of_DQN = np.load(f, allow_pickle=True).tolist()
 
 N_agents = 10
