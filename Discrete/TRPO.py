@@ -18,7 +18,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class TRPO:
-    def __init__(self, state_dim, action_dim, encoding_info = None, num_steps_per_rollout=15000, gae_gamma = 0.99, gae_lambda = 0.99, epsilon = 0.05, conj_grad_damping=0.1, lambda_ = 1e-3):
+    def __init__(self, state_dim, action_dim, encoding_info = None, num_steps_per_rollout=15000, gae_gamma = 0.99, gae_lambda = 0.99, epsilon = 0.05, 
+                 conj_grad_damping=0.1, lambda_ = 1e-3, lambda_gail = 1e-1):
         
         self.actor = SoftmaxHierarchicalActor.NN_PI_LO(state_dim, action_dim).to(device)
         self.value_function = Value_net(state_dim).to(device)
@@ -33,6 +34,8 @@ class TRPO:
         self.epsilon = epsilon
         self.conj_grad_damping = conj_grad_damping
         self.lambda_ = lambda_
+        self.lambda_gail = lambda_gail
+        
         self.Total_t = 0
         self.Total_iter = 0
         self.states = []
@@ -77,7 +80,7 @@ class TRPO:
             action = np.amin(np.where(draw_u<=prob_u_rescaled)[1])
         return int(action)
         
-    def GAE(self, env, GAIL = False, Discriminator = None):
+    def GAE(self, env, GAIL = False, Discriminator = None, reset = 'random', init_state = np.array([0,0,0,8]), Mixed_GAIL = False):
         step = 0
         self.Total_iter += 1
         self.states = []
@@ -91,7 +94,7 @@ class TRPO:
             episode_rewards = []
             episode_gammas = []
             episode_lambdas = []    
-            state, done = env.reset(), False
+            state, done = env.reset(reset, init_state), False
             t=0
             episode_reward = 0
 
@@ -126,8 +129,12 @@ class TRPO:
             episode_gammas = torch.FloatTensor(episode_gammas)
             episode_lambdas = torch.FloatTensor(episode_lambdas)        
             
-            if GAIL:
-                episode_rewards = - torch.log(Discriminator(episode_states, episode_actions)).squeeze().detach()
+            if GAIL and Mixed_GAIL and self.Total_iter>1:
+                episode_actions = F.one_hot(episode_actions, num_classes=self.action_dim)
+                episode_rewards = episode_rewards - self.lambda_gail*torch.log(Discriminator(episode_states, episode_actions)).squeeze().detach()
+            elif GAIL and self.Total_iter>1:
+                episode_actions = F.one_hot(episode_actions, num_classes=self.action_dim)
+                episode_rewards = -torch.log(Discriminator(episode_states, episode_actions)).squeeze().detach()
                 
             episode_discounted_rewards = episode_gammas*episode_rewards
             episode_discounted_returns = torch.FloatTensor([sum(episode_discounted_rewards[i:]) for i in range(t)])
@@ -144,7 +151,7 @@ class TRPO:
             self.gammas.append(episode_gammas)
             
         rollout_states = torch.FloatTensor(self.states)
-        rollout_actions = torch.FloatTensor(np.array(self.actions))
+        rollout_actions = torch.LongTensor(np.array(self.actions))
 
         return rollout_states, rollout_actions
     
@@ -180,7 +187,7 @@ class TRPO:
             rsold = rsnew   
         return x
     
-    def rescale_and_linesearch(self, g, s, Hs, L, kld, old_params, max_iter=10, success_ratio=0.1):
+    def rescale_and_linesearch(self, g, s, Hs, L, kld, old_params, max_iter=20, success_ratio=1e-10):
         TRPO.set_params(self.actor, old_params)
         L_old = L().detach()
         max_kl = self.epsilon
@@ -202,9 +209,9 @@ class TRPO:
             if ratio > success_ratio and actual_improv > 0 and kld_new < max_kl:
                 return new_params
     
-            eta *= 0.7
+            eta *= 0.5
     
-        print("The line search was failed!")
+        print("The line search has failed!")
         return old_params
     
     def train(self, Entropy = False):
@@ -215,7 +222,7 @@ class TRPO:
         rollout_advantage = torch.cat(self.advantage)
         rollout_gammas = torch.cat(self.gammas)        
         
-        rollout_advantage = (rollout_advantage-rollout_advantage.mean())/rollout_advantage.std()
+        rollout_advantage = ((rollout_advantage-rollout_advantage.mean())/rollout_advantage.std()).reshape(-1,1)
         
         self.value_function.train()
         old_params = TRPO.get_flat_params(self.value_function).detach()

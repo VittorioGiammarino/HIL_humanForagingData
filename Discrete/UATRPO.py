@@ -11,54 +11,21 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from models import SoftmaxHierarchicalActor
+from models import Value_net
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-class Gaussian_Actor(nn.Module):
-    def __init__(self, state_dim, action_dim, max_action):
-        super(Gaussian_Actor, self).__init__()
-    
-        self.net = torch.nn.Sequential(
-            torch.nn.Linear(state_dim, 256),
-            torch.nn.ReLU(),
-            torch.nn.Linear(256, 256),
-            torch.nn.ReLU(),
-            torch.nn.Linear(256, action_dim),
-        )
-        
-        self.action_dim = action_dim
-        self.state_dim = state_dim
-        self.log_std = torch.nn.Parameter(torch.zeros(action_dim))
-        self.max_action = max_action
-        		
-    def forward(self, states):        
-        mean = self.net(states)
-        std = torch.exp(self.log_std)
-        cov_mtx = torch.eye(self.action_dim) * (std ** 2)
-        distb = torch.distributions.MultivariateNormal(mean, cov_mtx)
-
-        return distb
-
-
-class Value_net(nn.Module):
-    def __init__(self, state_dim):
-        super(Value_net, self).__init__()
-        # Value_net architecture
-        self.l1 = nn.Linear(state_dim, 256)
-        self.l2 = nn.Linear(256, 256)
-        self.l3 = nn.Linear(256, 1)
-
-    def forward(self, state):
-        q1 = F.relu(self.l1(state))
-        q1 = F.relu(self.l2(q1))
-        q1 = self.l3(q1)    
-        return q1
-
 class UATRPO:
-    def __init__(self, state_dim, action_dim, max_action, num_steps_per_rollout=5000, gae_gamma = 0.99, gae_lambda = 0.99, 
+    def __init__(self, state_dim, action_dim, encoding_info = None, num_steps_per_rollout=5000, gae_gamma = 0.99, gae_lambda = 0.99, 
                  epsilon = 0.03, conj_grad_damping=0.1, random_projections = 200, beta = 0.9, alpha = 0.05, c=6e-4, lambda_ = 1e-3):
         
-        self.actor = Gaussian_Actor(state_dim, action_dim, max_action).to(device)
+        self.actor = SoftmaxHierarchicalActor.NN_PI_LO(state_dim, action_dim).to(device)
         self.value_function = Value_net(state_dim).to(device)
+        
+        self.state_dim = state_dim
+        self.action_dim = action_dim
+        self.encoding_info = encoding_info
         
         self.d = sum(p.numel() for p in self.actor.parameters() if p.requires_grad)
         self.random_projections = random_projections
@@ -70,9 +37,6 @@ class UATRPO:
         self.alpha = alpha
         self.trade_off = c
         
-        self.state_dim = state_dim
-        self.action_dim = action_dim
-        self.max_action = max_action
         self.num_steps_per_rollout = num_steps_per_rollout
         self.gae_gamma = gae_gamma
         self.gae_lambda = gae_lambda
@@ -93,14 +57,39 @@ class UATRPO:
         self.Total_iter = 0
         self.Total_trajs = 0
         
-    def select_action(self, state):
-        self.actor.eval()
-        state = torch.FloatTensor(state.reshape(1, -1)).to(device)
-        distb = self.actor(state)
-        action = distb.sample().detach().cpu().numpy().flatten()
-        return action
+    def encode_state(self, state):
+        state = state.flatten()
+        coordinates = state[0:2]
+        psi = state[2]
+        psi_encoded = np.zeros(self.encoding_info[0])
+        psi_encoded[int(psi)]=1
+        coin_dir_encoded = np.zeros(self.encoding_info[1])
+        coin_dir = state[3]
+        coin_dir_encoded[int(coin_dir)]=1
+        current_state_encoded = np.concatenate((coordinates,psi_encoded,coin_dir_encoded))
+        return current_state_encoded
+    
+    def encode_action(self, action):
+        action_encoded = np.zeros(self.action_dim)
+        action_encoded[int(action)]=1
+        return action_encoded
         
-    def GAE(self, env, GAIL = False, Discriminator = None):
+    def select_action(self, state):
+        state = UATRPO.encode_state(self, state)
+        state = torch.FloatTensor(state.reshape(1,-1)).to(device)
+        prob_u = self.actor(state).cpu().data.numpy()
+        prob_u_rescaled = np.divide(prob_u,np.amin(prob_u)+0.01)
+        for i in range(1,prob_u_rescaled.shape[1]):
+            prob_u_rescaled[0,i]=prob_u_rescaled[0,i]+prob_u_rescaled[0,i-1]
+        draw_u=np.divide(np.random.rand(),np.amin(prob_u)+0.01)
+        temp = np.where(draw_u<=prob_u_rescaled)[1]
+        if temp.size == 0:
+            action = np.argmax(prob_u)
+        else:
+            action = np.amin(np.where(draw_u<=prob_u_rescaled)[1])
+        return int(action)
+        
+    def GAE(self, env, GAIL = False, Discriminator = None, reset = 'random', init_state = np.array([0,0,0,8]), Mixed_GAIL = False):
         step = 0
         self.Total_iter += 1
         self.states = []
@@ -121,9 +110,11 @@ class UATRPO:
             while not done and step < self.num_steps_per_rollout:            
                 action = UATRPO.select_action(self, state)
             
-                self.states.append(state)
+                state_encoded = UATRPO.encode_state(self, state.flatten())
+            
+                self.states.append(state_encoded)
                 self.actions.append(action)
-                episode_states.append(state)
+                episode_states.append(state_encoded)
                 episode_actions.append(action)
                 episode_gammas.append(self.gae_gamma**t)
                 episode_lambdas.append(self.gae_lambda**t)
@@ -143,13 +134,17 @@ class UATRPO:
                 self.Total_trajs += 1
                 
             episode_states = torch.FloatTensor(episode_states)
-            episode_actions = torch.FloatTensor(episode_actions)
+            episode_actions = torch.LongTensor(episode_actions)
             episode_rewards = torch.FloatTensor(episode_rewards)
             episode_gammas = torch.FloatTensor(episode_gammas)
-            episode_lambdas = torch.FloatTensor(episode_lambdas)        
+            episode_lambdas = torch.FloatTensor(episode_lambdas)     
             
-            if GAIL:
-                episode_rewards = - torch.log(Discriminator(episode_states, episode_actions)).squeeze().detach()
+            if GAIL and Mixed_GAIL and self.Total_iter>1:
+                episode_actions = F.one_hot(episode_actions, num_classes=self.action_dim)
+                episode_rewards = episode_rewards - self.lambda_gail*torch.log(Discriminator(episode_states, episode_actions)).squeeze().detach()
+            elif GAIL and self.Total_iter>1:
+                episode_actions = F.one_hot(episode_actions, num_classes=self.action_dim)
+                episode_rewards = -torch.log(Discriminator(episode_states, episode_actions)).squeeze().detach()
                 
             episode_discounted_rewards = episode_gammas*episode_rewards
             episode_discounted_returns = torch.FloatTensor([sum(episode_discounted_rewards[i:]) for i in range(t)])
@@ -202,7 +197,7 @@ class UATRPO:
             rsold = rsnew   
         return x
     
-    def rescale_and_linesearch(self, g, eta_v, Fv, Sv, L, Rn2, kld, old_params, max_iter=10, success_ratio=0.1):
+    def rescale_and_linesearch(self, g, eta_v, Fv, Sv, L, Rn2, kld, old_params, max_iter=20, success_ratio=1e-10):
         UATRPO.set_params(self.actor, old_params)
         L_old = L().detach()
         max_kl = self.epsilon
@@ -237,12 +232,12 @@ class UATRPO:
     def train(self, Entropy=False):
         
         rollout_states = torch.FloatTensor(self.states)
-        rollout_actions = torch.FloatTensor(np.array(self.actions))
+        rollout_actions = torch.LongTensor(np.array(self.actions))
         rollout_returns = torch.cat(self.returns)
         rollout_advantage = torch.cat(self.advantage)
         rollout_gammas = torch.cat(self.gammas)        
         
-        rollout_advantage = (rollout_advantage-rollout_advantage.mean())/rollout_advantage.std()
+        rollout_advantage = ((rollout_advantage-rollout_advantage.mean())/rollout_advantage.std()).reshape(-1,1)
         
         self.value_function.train()
         old_params = UATRPO.get_flat_params(self.value_function).detach()
@@ -266,19 +261,16 @@ class UATRPO:
         
         self.actor.train()
         old_params = UATRPO.get_flat_params(self.actor).detach()
-        old_distb = self.actor(rollout_states)
+        old_log_prob, old_log_prob_rollout = self.actor.sample_log(rollout_states, rollout_actions)
         
         def L():
-            distb = self.actor(rollout_states)
-            return (rollout_advantage*torch.exp(distb.log_prob(rollout_actions) - old_distb.log_prob(rollout_actions).detach())).mean()
+            _, log_prob_rollout = self.actor.sample_log(rollout_states, rollout_actions)
+            return (rollout_advantage*torch.exp(log_prob_rollout - old_log_prob_rollout.detach())).mean()
         
         def kld():
-            distb = self.actor(rollout_states)
-            old_mean = old_distb.mean.detach()
-            old_cov = old_distb.covariance_matrix.sum(-1).detach()
-            mean = distb.mean
-            cov = distb.covariance_matrix.sum(-1)
-            return (0.5)*((old_cov/cov).sum(-1)+(((old_mean - mean) ** 2)/cov).sum(-1)-self.action_dim + torch.log(cov).sum(-1) - torch.log(old_cov).sum(-1)).mean()
+            prob = self.actor(rollout_states)
+            divKL = F.kl_div(old_log_prob.detach(), prob, reduction = 'batchmean')
+            return divKL
         
         grad_kld_old_param = UATRPO.get_flat_grads(kld(), self.actor)
         
@@ -352,8 +344,9 @@ class UATRPO:
         
         new_params = UATRPO.rescale_and_linesearch(self, gradient, eta_v_flat, Fv, Sv, L, Rn2, kld, old_params)
 
-        if Entropy:     
-            discounted_casual_entropy = ((-1)*rollout_gammas*self.actor(rollout_states).log_prob(rollout_actions)).mean()
+        if Entropy:
+            _, entropy_log_prob = self.actor.sample_log(rollout_states, rollout_actions)
+            discounted_casual_entropy = ((-1)*rollout_gammas*entropy_log_prob).mean()
             gradient_discounted_casual_entropy = UATRPO.get_flat_grads(discounted_casual_entropy, self.actor)
             new_params += self.lambda_*gradient_discounted_casual_entropy
             
@@ -363,7 +356,21 @@ class UATRPO:
         self.Y_S_old = Y_S_new
         self.beta_t += 1
         
-        
+    def save_actor(self, filename):
+        torch.save(self.actor.state_dict(), filename + "_actor")
+    
+    def load_actor(self, filename, HIL = False):
+        if HIL:
+            option = 0
+            self.actor.load_state_dict(torch.load(filename + f"_pi_lo_option_{option}"))
+        else:
+            self.actor.load_state_dict(torch.load(filename + "_actor"))
+
+    def save_critic(self, filename):
+        torch.save(self.value_function.state_dict(), filename + "_value_function")
+    
+    def load_critic(self, filename):
+        self.value_function.load_state_dict(torch.load(filename + "_value_function"))            
         
         
         

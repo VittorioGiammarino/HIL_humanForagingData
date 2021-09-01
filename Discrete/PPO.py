@@ -11,53 +11,16 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from models import SoftmaxHierarchicalActor
+from models import Value_net
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-class Gaussian_Actor(nn.Module):
-    def __init__(self, state_dim, action_dim, max_action):
-        super(Gaussian_Actor, self).__init__()
-    
-        self.net = torch.nn.Sequential(
-            torch.nn.Linear(state_dim, 256),
-            torch.nn.ReLU(),
-            torch.nn.Linear(256, 256),
-            torch.nn.ReLU(),
-            torch.nn.Linear(256, action_dim),
-        )
-        
-        self.action_dim = action_dim
-        self.state_dim = state_dim
-        self.log_std = torch.nn.Parameter(torch.zeros(action_dim))
-        self.max_action = max_action
-        		
-    def forward(self, states):        
-        mean = self.net(states)
-        std = torch.exp(self.log_std)
-        cov_mtx = torch.eye(self.action_dim) * (std ** 2)
-        distb = torch.distributions.MultivariateNormal(mean, cov_mtx)
-
-        return distb
-
-
-class Value_net(nn.Module):
-    def __init__(self, state_dim):
-        super(Value_net, self).__init__()
-        # Value_net architecture
-        self.l1 = nn.Linear(state_dim, 256)
-        self.l2 = nn.Linear(256, 256)
-        self.l3 = nn.Linear(256, 1)
-
-    def forward(self, state):
-        q1 = F.relu(self.l1(state))
-        q1 = F.relu(self.l2(q1))
-        q1 = self.l3(q1)    
-        return q1
-
 class PPO:
-    def __init__(self, state_dim, action_dim, max_action, lr = 3e-4, num_steps_per_rollout=5000, gae_gamma = 0.99, gae_lambda = 0.99, 
-                 epsilon = 0.2, c1 = 1, c2 = 1e-2, minibatch_size=64, num_epochs=10):
+    def __init__(self, state_dim, action_dim, encoding_info = None, num_steps_per_rollout=15000, lr = 3e-4, gae_gamma = 0.99, gae_lambda = 0.99, 
+                 epsilon = 0.2, c1 = 1, c2 = 1e-2, minibatch_size=64, num_epochs=10, lambda_gail = 1e-1):
         
-        self.actor = Gaussian_Actor(state_dim, action_dim, max_action).to(device)
+        self.actor = SoftmaxHierarchicalActor.NN_PI_LO(state_dim, action_dim).to(device)
         self.value_function = Value_net(state_dim).to(device)
         
         self.optimizer_actor = torch.optim.Adam(self.actor.parameters(), lr)
@@ -65,7 +28,8 @@ class PPO:
         
         self.state_dim = state_dim
         self.action_dim = action_dim
-        self.max_action = max_action
+        self.encoding_info = encoding_info
+
         self.num_steps_per_rollout = num_steps_per_rollout
         self.gae_gamma = gae_gamma
         self.gae_lambda = gae_lambda
@@ -74,6 +38,7 @@ class PPO:
         self.c2 = c2
         self.minibatch_size = minibatch_size
         self.num_epochs = num_epochs
+        self.lambda_gail = lambda_gail
         
         self.Total_t = 0
         self.Total_iter = 0
@@ -87,14 +52,39 @@ class PPO:
         self.Total_t = 0
         self.Total_iter = 0
         
-    def select_action(self, state):
-        self.actor.eval()
-        state = torch.FloatTensor(state.reshape(1, -1)).to(device)
-        distb = self.actor(state)
-        action = distb.sample().detach().cpu().numpy().flatten()
-        return action
+    def encode_state(self, state):
+        state = state.flatten()
+        coordinates = state[0:2]
+        psi = state[2]
+        psi_encoded = np.zeros(self.encoding_info[0])
+        psi_encoded[int(psi)]=1
+        coin_dir_encoded = np.zeros(self.encoding_info[1])
+        coin_dir = state[3]
+        coin_dir_encoded[int(coin_dir)]=1
+        current_state_encoded = np.concatenate((coordinates,psi_encoded,coin_dir_encoded))
+        return current_state_encoded
+    
+    def encode_action(self, action):
+        action_encoded = np.zeros(self.action_dim)
+        action_encoded[int(action)]=1
+        return action_encoded
         
-    def GAE(self, env, GAIL = False, Discriminator = None):
+    def select_action(self, state):
+        state = PPO.encode_state(self, state)
+        state = torch.FloatTensor(state.reshape(1,-1)).to(device)
+        prob_u = self.actor(state).cpu().data.numpy()
+        prob_u_rescaled = np.divide(prob_u,np.amin(prob_u)+0.01)
+        for i in range(1,prob_u_rescaled.shape[1]):
+            prob_u_rescaled[0,i]=prob_u_rescaled[0,i]+prob_u_rescaled[0,i-1]
+        draw_u=np.divide(np.random.rand(),np.amin(prob_u)+0.01)
+        temp = np.where(draw_u<=prob_u_rescaled)[1]
+        if temp.size == 0:
+            action = np.argmax(prob_u)
+        else:
+            action = np.amin(np.where(draw_u<=prob_u_rescaled)[1])
+        return int(action)
+        
+    def GAE(self, env, GAIL = False, Discriminator = None, reset = 'random', init_state = np.array([0,0,0,8]), Mixed_GAIL = False):
         step = 0
         self.Total_iter += 1
         self.states = []
@@ -108,16 +98,18 @@ class PPO:
             episode_rewards = []
             episode_gammas = []
             episode_lambdas = []    
-            state, done = env.reset(), False
+            state, done = env.reset(reset, init_state), False
             t=0
             episode_reward = 0
 
             while not done and step < self.num_steps_per_rollout:            
                 action = PPO.select_action(self, state)
+                
+                state_encoded = PPO.encode_state(self, state.flatten())
             
-                self.states.append(state)
+                self.states.append(state_encoded)
                 self.actions.append(action)
-                episode_states.append(state)
+                episode_states.append(state_encoded)
                 episode_actions.append(action)
                 episode_gammas.append(self.gae_gamma**t)
                 episode_lambdas.append(self.gae_lambda**t)
@@ -131,18 +123,22 @@ class PPO:
                 episode_reward+=reward
                 self.Total_t += 1
                         
-            if done: 
-                # +1 to account for 0 indexing. +0 on ep_timesteps since it will increment +1 even if done=True
-                print(f"Total T: {self.Total_t}, Iter Num: {self.Total_iter}, Episode T: {t} Reward: {episode_reward:.3f}")
+            # if done: 
+            #     # +1 to account for 0 indexing. +0 on ep_timesteps since it will increment +1 even if done=True
+            #     print(f"Total T: {self.Total_t}, Iter Num: {self.Total_iter}, Episode T: {t} Reward: {episode_reward:.3f}")
                 
             episode_states = torch.FloatTensor(episode_states)
-            episode_actions = torch.FloatTensor(episode_actions)
+            episode_actions = torch.LongTensor(episode_actions)
             episode_rewards = torch.FloatTensor(episode_rewards)
             episode_gammas = torch.FloatTensor(episode_gammas)
             episode_lambdas = torch.FloatTensor(episode_lambdas)        
             
-            if GAIL:
-                episode_rewards = - torch.log(Discriminator(episode_states, episode_actions)).squeeze().detach()
+            if GAIL and Mixed_GAIL and self.Total_iter>1:
+                episode_actions = F.one_hot(episode_actions, num_classes=self.action_dim)
+                episode_rewards = episode_rewards - self.lambda_gail*torch.log(Discriminator(episode_states, episode_actions)).squeeze().detach()
+            elif GAIL and self.Total_iter>1:
+                episode_actions = F.one_hot(episode_actions, num_classes=self.action_dim)
+                episode_rewards = -torch.log(Discriminator(episode_states, episode_actions)).squeeze().detach()
                 
             episode_discounted_rewards = episode_gammas*episode_rewards
             episode_discounted_returns = torch.FloatTensor([sum(episode_discounted_rewards[i:]) for i in range(t)])
@@ -159,7 +155,7 @@ class PPO:
             self.gammas.append(episode_gammas)
             
         rollout_states = torch.FloatTensor(self.states)
-        rollout_actions = torch.FloatTensor(np.array(self.actions))
+        rollout_actions = torch.LongTensor(np.array(self.actions))
 
         return rollout_states, rollout_actions
     
@@ -167,15 +163,17 @@ class PPO:
     def train(self, Entropy = False):
         
         rollout_states = torch.FloatTensor(self.states)
-        rollout_actions = torch.FloatTensor(np.array(self.actions))
+        rollout_actions = torch.LongTensor(np.array(self.actions))
         rollout_returns = torch.cat(self.returns)
         rollout_advantage = torch.cat(self.advantage)
-        rollout_gammas = torch.cat(self.gammas)        
+        rollout_gammas = torch.cat(self.gammas)         
         
-        rollout_advantage = (rollout_advantage-rollout_advantage.mean())/rollout_advantage.std()
+        rollout_advantage = ((rollout_advantage-rollout_advantage.mean())/rollout_advantage.std()).reshape(-1,1)
         
         self.actor.eval()
-        old_log_pi = self.actor(rollout_states).log_prob(rollout_actions).detach()
+        old_log_prob, old_log_prob_rollout = self.actor.sample_log(rollout_states, rollout_actions)
+        old_log_prob = old_log_prob.detach()
+        old_log_prob_rollout = old_log_prob_rollout.detach()
         
         self.value_function.train()
         self.actor.train()
@@ -191,19 +189,17 @@ class PPO:
             batch_advantage = rollout_advantage[minibatch_indices]
             batch_gammas = rollout_gammas[minibatch_indices]       
             
-        
-            distb = self.actor(batch_states)
-            log_pi = distb.log_prob(batch_actions)
-            batch_old_log_pi = old_log_pi[minibatch_indices]
+            log_prob, log_prob_rollout = self.actor.sample_log(batch_states, batch_actions)
+            batch_old_log_pi = old_log_prob_rollout[minibatch_indices]
             
-            r = torch.exp(log_pi - batch_old_log_pi)
+            r = torch.exp(log_prob_rollout - batch_old_log_pi)
             L_clip = torch.minimum(r*batch_advantage, torch.clip(r, 1-self.epsilon, 1+self.epsilon)*batch_advantage)
             L_vf = (self.value_function(batch_states).squeeze() - batch_returns)**2
             
             if Entropy:
-                S = distb.entropy()
+                S = (-1)*torch.sum(torch.exp(log_prob)*log_prob, 1)
             else:
-                S = torch.zeros_like(distb.entropy())
+                S = torch.zeros_like(torch.sum(torch.exp(log_prob)*log_prob, 1))
                 
             self.optimizer_value_function.zero_grad()
             self.optimizer_actor.zero_grad()
@@ -213,7 +209,21 @@ class PPO:
             self.optimizer_actor.step()        
         
         
-        
+    def save_actor(self, filename):
+        torch.save(self.actor.state_dict(), filename + "_actor")
+    
+    def load_actor(self, filename, HIL = False):
+        if HIL:
+            option = 0
+            self.actor.load_state_dict(torch.load(filename + f"_pi_lo_option_{option}"))
+        else:
+            self.actor.load_state_dict(torch.load(filename + "_actor"))
+
+    def save_critic(self, filename):
+        torch.save(self.value_function.state_dict(), filename + "_value_function")
+    
+    def load_critic(self, filename):
+        self.value_function.load_state_dict(torch.load(filename + "_value_function"))           
         
         
 

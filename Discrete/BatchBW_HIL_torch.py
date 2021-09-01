@@ -510,8 +510,8 @@ class BatchBW(object):
         gamma = BatchBW.Gamma(self, alpha, beta)
         gamma_tilde = BatchBW.GammaTilde(self, alpha, beta)
     
-        print('Expectation done')
-        print('Starting maximization step')
+        # print('Expectation done')
+        # print('Starting maximization step')
         
         gamma_tilde_reshaped = BatchBW.GammaTildeReshape(gamma_tilde, self.option_dim)
         gamma_actions = BatchBW.GammaReshapeActions(T, self.option_dim, self.action_space_discrete, gamma, self.Labels)
@@ -525,7 +525,7 @@ class BatchBW(object):
 
 
         loss = BatchBW.OptimizeLossBatch(self, gamma_tilde_reshaped, gamma_reshaped_options, gamma_actions, auxiliary_vector)
-        print('Maximization done, Loss:', float(loss)) #float(loss_options+loss_action+loss_termination))
+        # print('Maximization done, Loss:', float(loss)) #float(loss_options+loss_action+loss_termination))
  
         return loss
 

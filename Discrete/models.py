@@ -136,3 +136,24 @@ class Value_net(nn.Module):
         q1 = F.relu(self.l2(q1))
         q1 = self.l3(q1)    
         return q1
+    
+class Discriminator(nn.Module):
+    def __init__(self, state_dim, action_dim):
+        super(Discriminator, self).__init__()
+
+        # architecture
+        self.l1 = nn.Linear(state_dim + action_dim, 256)
+        self.l2 = nn.Linear(256, 256)
+        self.l3 = nn.Linear(256, 1)
+
+    def forward(self, state, action):
+        return torch.sigmoid(self.get_logits(state, action))
+
+    def get_logits(self, state, action):
+        state = torch.FloatTensor(state)
+        action = torch.LongTensor(action)
+        sa = torch.cat([state, action], 1)
+        d = F.relu(self.l1(sa))
+        d = F.relu(self.l2(d))
+        d = self.l3(d)
+        return d

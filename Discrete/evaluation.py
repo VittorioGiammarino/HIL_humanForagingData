@@ -73,12 +73,12 @@ def HierarchicalStochasticSampleTrajMDP(Hierarchical_policy, env, max_epoch_per_
     
     return traj, control, Option, Termination, Reward_array    
 
-def eval_policy(policy, env_name, seed, training_iter, eval_episodes=10):
+def eval_policy(policy, env_name, seed, training_iter, eval_episodes=10, reset = 'random', initial_state = np.array([0,0,0,8])):
 	eval_env = env_name
 
 	avg_reward = 0.
 	for _ in range(eval_episodes):
-		state, done = eval_env.reset(), False
+		state, done = eval_env.reset(reset, initial_state), False
 		while not done:
 			action = policy.select_action(np.array(state))
 			state, reward, done, _ = eval_env.step(action)

@@ -51,7 +51,7 @@ parser = argparse.ArgumentParser()
 #General
 parser.add_argument("--number_options", default=2, type=int)     # number of options
 parser.add_argument("--policy", default="HSAC")                   # Policy name (TD3, DDPG or OurDDPG)
-parser.add_argument("--seed", default=0, type=int)               # Sets Gym, PyTorch and Numpy seeds
+parser.add_argument("--seed", default=3, type=int)               # Sets Gym, PyTorch and Numpy seeds
 parser.add_argument("--env", default="Foraging")               # Sets Gym, PyTorch and Numpy seeds
 #HIL
 parser.add_argument("--HIL", default=True, type=bool)         # Batch size for HIL
@@ -68,7 +68,7 @@ parser.add_argument("--HTD0_timesteps", default=3e5, type=int)    # Max time ste
 # HRL
 parser.add_argument("--start_timesteps", default=25e3, type=int) # Time steps before training default=25e3
 parser.add_argument("--eval_freq", default=15e3, type=int)        # How often (time steps) we evaluate
-parser.add_argument("--max_timesteps", default=1e6, type=int)    # Max time steps to run environment
+parser.add_argument("--max_timesteps", default=3e6, type=int)    # Max time steps to run environment
 parser.add_argument("--expl_noise", default=0.1)                 # Std of Gaussian exploration noise
 parser.add_argument("--batch_size", default=256, type=int)       # Batch size for both actor and critic
 parser.add_argument("--discount", default=0.99)                  # Discount factor
@@ -298,7 +298,8 @@ if args.init_critic:
             option = Train_Critic.select_option(state, initial_b, initial_option)   
             
     Train_Critic.save(f"./models/H_TD0/H_TD0_{args.env}_{args.seed}")
-        
+# %% Train Policy HSAC
+    
 if args.policy == "HSAC":
     kwargs = {
     	"state_dim": state_dim,
@@ -306,28 +307,28 @@ if args.policy == "HSAC":
         "option_dim": option_dim,
         "termination_dim": termination_dim,
         "encoding_info": encoding_info,
-        "l_rate_pi_lo": 3e-4,
-        "l_rate_pi_hi": 1e-6,
-        "l_rate_pi_b": 1e-6,
-        "l_rate_critic": 3e-4, 
+        "l_rate_pi_lo": 1e-2,
+        "l_rate_pi_hi": 3e-4,
+        "l_rate_pi_b": 3e-4,
+        "l_rate_critic": 1e-2, 
         "discount": 0.99,
-        "tau": 0.005, 
-        "eta": 1e-7, 
-        "pi_b_freq": 500,
-        "pi_hi_freq": 2e-5,
-        "alpha": 0.2,
+        "tau": 0.05, 
+        "eta": 1e-5, 
+        "pi_b_freq": 10,
+        "pi_hi_freq": 20,
+        "alpha": 1,
         "critic_freq": 2
         }
     Agent_HRL = H_SAC.H_SAC(**kwargs)
     if args.load_model and args.HIL:
     	Agent_HRL.load_actor(f"./models/HIL/HIL_{args.env}_{args.seed}")
-    if args.load_model and args.init_critic:
-    	Agent_HRL.load_critic(f"./models/H_TD0/H_TD0_{args.env}_{args.seed}")
+    # if args.load_model and args.init_critic:
+    # 	Agent_HRL.load_critic(f"./models/H_TD0/H_TD0_{args.env}_{args.seed}")
 
 # Evaluate untrained policy
 evaluation_HRL = []
 [trajBatch_torch, controlBatch_torch, OptionsBatch_torch, 
-  TerminationBatch_torch, RewardBatch_torch] = HierarchicalStochasticSampleTrajMDP(Agent_HRL, env, max_epoch, eval_episodes)
+  TerminationBatch_torch, RewardBatch_torch] = HierarchicalStochasticSampleTrajMDP(Agent_HRL, env, max_epoch, eval_episodes, 'standard', TrainingSet[0,:])
 avg_reward = np.sum(RewardBatch_torch)/eval_episodes
 evaluation_HRL.append(avg_reward)
 
@@ -396,7 +397,7 @@ for t in range(int(args.max_timesteps)):
     # Evaluate episode
     if (t + 1) % args.eval_freq == 0:
         [trajBatch_torch, controlBatch_torch, OptionsBatch_torch, 
-         TerminationBatch_torch, RewardBatch_torch] = HierarchicalStochasticSampleTrajMDP(Agent_HRL, env, max_epoch, eval_episodes)
+         TerminationBatch_torch, RewardBatch_torch] = HierarchicalStochasticSampleTrajMDP(Agent_HRL, env, max_epoch, eval_episodes, 'standard', TrainingSet[0,:])
         avg_reward = np.sum(RewardBatch_torch)/eval_episodes
         evaluation_HRL.append(avg_reward)
         print("---------------------------------------")
