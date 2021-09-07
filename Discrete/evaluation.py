@@ -90,3 +90,15 @@ def eval_policy(policy, env_name, seed, training_iter, eval_episodes=10, reset =
 	print(f"Seed {seed}, Iter {training_iter}, Evaluation over {eval_episodes} episodes: {avg_reward:.3f}")
 	print("---------------------------------------")
 	return avg_reward
+
+def evaluate_H(seed, Hierarchical_policy, env, max_epoch_per_traj, number_of_trajectories, reset = 'random', initial_state = np.array([0,0,0,8])):
+    
+    [trajBatch_torch, controlBatch_torch, OptionsBatch_torch, 
+    TerminationBatch_torch, RewardBatch_torch] = HierarchicalStochasticSampleTrajMDP(Hierarchical_policy, env, max_epoch_per_traj, number_of_trajectories, reset, initial_state)
+    avg_reward = np.sum(RewardBatch_torch)/number_of_trajectories
+    
+    print("---------------------------------------")
+    print(f"Seed {seed}, Evaluation over {number_of_trajectories} episodes: {avg_reward:.3f}")
+    print("---------------------------------------")
+    
+    return avg_reward

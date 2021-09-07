@@ -137,6 +137,22 @@ class Value_net(nn.Module):
         q1 = self.l3(q1)    
         return q1
     
+class Value_net_H(nn.Module):
+    def __init__(self, state_dim, option_dim):
+        super(Value_net_H, self).__init__()
+        # Value_net architecture
+        self.l1 = nn.Linear(state_dim + option_dim, 256)
+        self.l2 = nn.Linear(256, 256)
+        self.l3 = nn.Linear(256, 1)
+
+    def forward(self, state, option):
+        so = torch.cat([state, option], 1)
+        
+        q1 = F.relu(self.l1(so))
+        q1 = F.relu(self.l2(q1))
+        q1 = self.l3(q1)    
+        return q1
+    
 class Discriminator(nn.Module):
     def __init__(self, state_dim, action_dim):
         super(Discriminator, self).__init__()

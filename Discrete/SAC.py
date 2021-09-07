@@ -4,6 +4,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from Buffer import ReplayBuffer
+from models import SoftmaxHierarchicalActor
+from models import Critic
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -11,126 +14,82 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # Paper: https://arxiv.org/abs/1802.09477
 
     
-class Gaussian_Actor(nn.Module):
-    def __init__(self, state_dim, action_dim, max_action):
-        super(Gaussian_Actor, self).__init__()
-    
-        self.net = torch.nn.Sequential(
-            torch.nn.Linear(state_dim, 256),
-            torch.nn.ReLU(),
-            torch.nn.Linear(256, 256),
-            torch.nn.ReLU(),
-            torch.nn.Linear(256, action_dim),
-        )
-        
-        self.action_dim = action_dim
-        self.state_dim = state_dim
-        self.log_std = torch.nn.Parameter(torch.zeros(action_dim))
-        self.max_action = max_action
-        		
-    def forward(self, state):        
-        mean = self.net(state)
-        log_std = self.log_std.clamp(-20,2)
-        std = torch.exp(log_std) 
-        return mean, std
-    
-    def sample(self, state):
-        mean, std = self.forward(state)
-        normal = torch.distributions.Normal(mean, std)
-        x_t = normal.rsample()  # for reparameterization trick (mean + std * N(0,1))
-        y_t = torch.tanh(x_t)
-        action = y_t * self.max_action[0]
-        log_prob = normal.log_prob(x_t)
-        # Enforcing Action Bound
-        log_prob -= torch.log(self.max_action[0] * (1 - y_t.pow(2)) + 1e-6)
-        log_prob = log_prob.sum(1, keepdim=True)
-        mean = torch.tanh(mean) * self.max_action[0]
-        return action, log_prob, mean        
-
-
-class Critic(nn.Module):
-    def __init__(self, state_dim, action_dim):
-        super(Critic, self).__init__()
-
-        # Q1 architecture
-        self.l1 = nn.Linear(state_dim + action_dim, 256)
-        self.l2 = nn.Linear(256, 256)
-        self.l3 = nn.Linear(256, 1)
-
-        # Q2 architecture
-        self.l4 = nn.Linear(state_dim + action_dim, 256)
-        self.l5 = nn.Linear(256, 256)
-        self.l6 = nn.Linear(256, 1)
-
-
-    def forward(self, state, action):
-        sa = torch.cat([state, action], 1)
-        
-        q1 = F.relu(self.l1(sa))
-        q1 = F.relu(self.l2(q1))
-        q1 = self.l3(q1)
-        
-        q2 = F.relu(self.l4(sa))
-        q2 = F.relu(self.l5(q2))
-        q2 = self.l6(q2)
-        return q1, q2
-
-
-    def Q1(self, state, action):
-        sa = torch.cat([state, action], 1)
-        
-        q1 = F.relu(self.l1(sa))
-        q1 = F.relu(self.l2(q1))
-        q1 = self.l3(q1)
-        return q1
-
-
 class SAC(object):
-    def __init__(self, state_dim, action_dim, max_action, l_rate=3e-4, discount=0.99, tau=0.005, alpha=0.2, critic_freq=2):
+    def __init__(self, state_dim, action_dim, encoding_info = None, l_rate=3e-4, discount=0.99, tau=0.005, alpha=0.2, critic_freq=2):
 
-        self.actor = Gaussian_Actor(state_dim, action_dim, max_action).to(device)
+        self.actor = SoftmaxHierarchicalActor.NN_PI_LO(state_dim, action_dim).to(device)
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=3e-4)
         
-        self.critic = Critic(state_dim, action_dim).to(device)
+        self.critic = Critic(state_dim, action_dim, 1).to(device)
         self.critic_target = copy.deepcopy(self.critic)
         self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=3e-4)
         
-        self.target_entropy = -torch.FloatTensor([action_dim]).to(device)
+        self.target_entropy = -torch.FloatTensor([1]).to(device)
         self.log_alpha = torch.zeros(1, requires_grad=True).to(device)
         self.alpha_optim = torch.optim.Adam([self.log_alpha], lr = l_rate)     
 
         self.state_dim = state_dim
         self.action_dim = action_dim
-        self.max_action = max_action
         self.discount = discount
         self.tau = tau
         self.alpha = alpha
         self.critic_freq = critic_freq
+        
+        self.Buffer = ReplayBuffer(state_dim, action_dim)
 
         self.total_it = 0
 
+    def encode_state(self, state):
+        state = state.flatten()
+        coordinates = state[0:2]
+        psi = state[2]
+        psi_encoded = np.zeros(self.encoding_info[0])
+        psi_encoded[int(psi)]=1
+        coin_dir_encoded = np.zeros(self.encoding_info[1])
+        coin_dir = state[3]
+        coin_dir_encoded[int(coin_dir)]=1
+        current_state_encoded = np.concatenate((coordinates,psi_encoded,coin_dir_encoded))
+        return current_state_encoded
+    
+    def encode_action(self, action):
+        action_encoded = np.zeros(self.action_dim)
+        action_encoded[int(action)]=1
+        return action_encoded
+        
     def select_action(self, state):
-        state = torch.FloatTensor(state.reshape(1, -1)).to(device)
-        action, _, _ = self.actor.sample(state)
-        return (action).cpu().data.numpy().flatten()
+        state = SAC.encode_state(self, state)
+        state = torch.FloatTensor(state.reshape(1,-1)).to(device)
+        prob_u = self.actor(state).cpu().data.numpy()
+        prob_u_rescaled = np.divide(prob_u,np.amin(prob_u)+0.01)
+        for i in range(1,prob_u_rescaled.shape[1]):
+            prob_u_rescaled[0,i]=prob_u_rescaled[0,i]+prob_u_rescaled[0,i-1]
+        draw_u=np.divide(np.random.rand(),np.amin(prob_u)+0.01)
+        temp = np.where(draw_u<=prob_u_rescaled)[1]
+        if temp.size == 0:
+            action = np.argmax(prob_u)
+        else:
+            action = np.amin(np.where(draw_u<=prob_u_rescaled)[1])
+        return int(action)
 
-    def train(self, replay_buffer, batch_size=256):
+    def train(self, batch_size=256):
         self.total_it += 1
 
 		# Sample replay buffer 
-        state, action, next_state, reward, not_done = replay_buffer.sample(batch_size)
+        state, action, next_state, reward, not_done = self.Buffer.sample(batch_size)
+        option_vector = torch.zeros_like(reward[:,0] , dtype=int)
 
         with torch.no_grad():
             # Select action according to policy and add clipped noise			
-            next_action, log_pi_next_state, _ = self.actor.sample(next_state)
+            next_action, log_pi_next_state = self.actor.sample(next_state)
+            next_action = F.one_hot(next_action, num_classes=self.action_dim)
 
             # Compute the target Q value
-            target_Q1, target_Q2 = self.critic_target(next_state, next_action)
+            target_Q1, target_Q2 = self.critic_target(next_state, next_action, option_vector)
             target_Q = torch.min(target_Q1, target_Q2) - self.alpha*log_pi_next_state
             target_Q = reward + not_done * self.discount * target_Q
 
 		# Get current Q estimates
-        current_Q1, current_Q2 = self.critic(state, action)
+        current_Q1, current_Q2 = self.critic(state, action, option_vector)
 
 		# Compute critic loss
         critic_loss = F.mse_loss(current_Q1, target_Q) + F.mse_loss(current_Q2, target_Q)
@@ -140,9 +99,9 @@ class SAC(object):
         critic_loss.backward()
         self.critic_optimizer.step()
 
-        action, log_pi_state, _ = self.actor.sample(state)   
+        action, log_pi_state = self.actor.sample(state)   
         
-        Q1, Q2 = self.critic(state, action)
+        Q1, Q2 = self.critic(state, action, option_vector)
 
         actor_loss = ((self.alpha*log_pi_state)-torch.min(Q1,Q2)).mean()
 			
@@ -166,20 +125,27 @@ class SAC(object):
 
 
 
-    def save(self, filename):
-        torch.save(self.critic.state_dict(), filename + "_critic")
-        torch.save(self.critic_optimizer.state_dict(), filename + "_critic_optimizer")
-		
+    def save_actor(self, filename):
         torch.save(self.actor.state_dict(), filename + "_actor")
         torch.save(self.actor_optimizer.state_dict(), filename + "_actor_optimizer")
-
-
-    def load(self, filename):
-        self.critic.load_state_dict(torch.load(filename + "_critic"))
+        
+    def load_actor(self, filename, HIL = False):
+        if HIL:
+            option = 0
+            self.actor.load_state_dict(torch.load(filename + f"_pi_lo_option_{option}"))
+            self.actor_optimizer.load_state_dict(torch.load(filename + f"_pi_lo_optimizer_option_{option}"))
+            self.actor_target = copy.deepcopy(self.actor)
+        else:      
+            self.actor.load_state_dict(torch.load(filename + "_actor"))
+            self.actor_optimizer.load_state_dict(torch.load(filename + "_actor_optimizer"))
+            self.actor_target = copy.deepcopy(self.actor)
+        
+    def save_critic(self, filename):
+        torch.save(self.Critic.state_dict(), filename + "_critic")
+        torch.save(self.critic_optimizer.state_dict(), filename + "_critic_optimizer")
+    
+    def load_critic(self, filename):
+        self.Critic.load_state_dict(torch.load(filename + "_critic"))
         self.critic_optimizer.load_state_dict(torch.load(filename + "_critic_optimizer"))
-        self.critic_target = copy.deepcopy(self.critic)
-
-        self.actor.load_state_dict(torch.load(filename + "_actor"))
-        self.actor_optimizer.load_state_dict(torch.load(filename + "_actor_optimizer"))
-        self.actor_target = copy.deepcopy(self.actor)
+        self.Critic_target = copy.deepcopy(self.Critic)
 		

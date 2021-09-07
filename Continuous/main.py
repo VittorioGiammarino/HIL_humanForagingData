@@ -26,79 +26,95 @@ import World
 import BatchBW_HIL_pytorch
 import Behavioral_cloning
 
-# %% Preprocessing_data from humans with psi based on the coins clusters distribution  
-Folders = [6] #, 7, 11, 12, 15]
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-TrainingSet, Labels, Trajectories, Rotation, Time, _, _, _, _ = Show_DataSet(Folders, 'distr_only')
-_,_,_,_,_, Reward_eval_human, Real_Traj_eval_human, Real_Reward_eval_human, Real_Time_eval_human = Show_DataSet(Folders, 'full_coins')
+# %% Load Data
+
+TrainingSet_tot = np.load("./Expert_data/TrainingSet.npy")
+Labels_tot = np.load("./Expert_data/Labels.npy")
+Trajectories = np.load("./Expert_data/Trajectories.npy", allow_pickle=True).tolist()
+Rotation = np.load("./Expert_data/Rotation.npy", allow_pickle=True).tolist()
+Time = np.load("./Expert_data/Time.npy", allow_pickle=True).tolist()
+Reward_eval_human = np.load("./Expert_data/Reward_eval_human.npy")
+Real_Traj_eval_human = np.load("./Expert_data/Real_Traj_eval_human.npy", allow_pickle=True).tolist()
+Real_Reward_eval_human = np.load("./Expert_data/Real_Reward_eval_human.npy", allow_pickle=True).tolist()
+Real_Time_eval_human = np.load("./Expert_data/Real_Time_eval_human.npy", allow_pickle=True).tolist()
+Coins_location = np.load("./Expert_data/Coins_location.npy")
+    
+difference_reward = Real_Reward_eval_human - Reward_eval_human
+
+Rand_traj = np.argmin(difference_reward)
+threshold = np.mean(Real_Reward_eval_human)
+TrainingSet = Trajectories[Rand_traj]
+Labels = Rotation[Rand_traj]
+size_data = len(Trajectories[Rand_traj])
+coins_location = Coins_location[Rand_traj,:,:] 
 
 # %%
 threshold = np.mean(Real_Reward_eval_human)
 Rand_traj = 2
 
 nTraj = Rand_traj%10
-folder = Folders[int(Rand_traj/10)]
-coins_location = World.Foraging.CoinLocation(folder, nTraj+1, 'full_coins')
 
 max_epoch_per_traj = len(Trajectories[Rand_traj])
 action_samples = Rotation[Rand_traj][:,0].reshape(len(Rotation[Rand_traj][:,0]),1)
-env = World.Foraging.env(folder, nTraj)
+env = World.Foraging.env(coins_location, np.array([0,0,0,8]), max_epoch_per_traj)
 
-# def test(labels, env, max_epoch_per_traj, number_of_trajectories, reset = 'random', initial_state = np.array([0,0,0,8])):
-#     traj = [[None]*1 for _ in range(number_of_trajectories)]
-#     control = [[None]*1 for _ in range(number_of_trajectories)]
-#     Reward_array = np.empty((0,0),int)
+def test(labels, env, max_epoch_per_traj, number_of_trajectories, reset = 'random', initial_state = np.array([0,0,0,8])):
+    traj = [[None]*1 for _ in range(number_of_trajectories)]
+    control = [[None]*1 for _ in range(number_of_trajectories)]
+    Reward_array = np.empty((0,0),int)
 
-#     for t in range(number_of_trajectories):
-#         done = False
-#         obs = env.reset(reset, initial_state)
-#         size_input = len(obs)
-#         x = np.empty((0,size_input),int)
-#         x = np.append(x, obs.reshape((1,size_input)), axis=0)
-#         u_tot = np.empty((0,1))
-#         Reward = 0
+    for t in range(number_of_trajectories):
+        done = False
+        obs = env.reset(reset, initial_state)
+        size_input = len(obs)
+        x = np.empty((0,size_input),int)
+        x = np.append(x, obs.reshape((1,size_input)), axis=0)
+        u_tot = np.empty((0,1))
+        Reward = 0
         
-#         for k in range(0, max_epoch_per_traj):
-#             # given action, draw next state
-#             obs, reward, done, _ = env.step(labels[k,:])
-#             Reward = Reward + reward
-#             x = np.append(x, obs.reshape((1,size_input)), axis=0)
+        for k in range(0, max_epoch_per_traj):
+            # given action, draw next state
+            obs, reward, done, _ = env.step(labels[k,:])
+            Reward = Reward + reward
+            x = np.append(x, obs.reshape((1,size_input)), axis=0)
 
-#             if done == True:
-#                 break
+            if done == True:
+                break
 
-#         traj[t] = x
-#         control[t]=u_tot
-#         Reward_array = np.append(Reward_array, Reward)
+        traj[t] = x
+        control[t]=u_tot
+        Reward_array = np.append(Reward_array, Reward)
 
-#     return traj, control, Reward_array    
+    return traj, control, Reward_array    
 
 
-# traj, control, Reward_array = test(action_samples, env, max_epoch_per_traj, 1, reset = 'standard', initial_state = Trajectories[Rand_traj][0,:])
+traj, control, Reward_array = test(action_samples, env, max_epoch_per_traj, 1, reset = 'standard', initial_state = Trajectories[Rand_traj][0,:])
     
 
-# sigma1 = 0.5
-# circle1 = ptch.Circle((6, 7.5), 2*sigma1, color='k',  fill=False)
-# sigma2 = 1.1
-# circle2 = ptch.Circle((-1.5, -5), 2*sigma2, color='k',  fill=False)
-# sigma3 = 1.8
-# circle3 = ptch.Circle((-5, 3), 2*sigma3, color='k',  fill=False)
-# sigma4 = 1.3
-# circle4 = ptch.Circle((4.9, -4), 2*sigma4, color='k',  fill=False)
-# fig, ax = plt.subplots()
-# ax.add_artist(circle1)
-# ax.add_artist(circle2)
-# ax.add_artist(circle3)
-# ax.add_artist(circle4)
-# plot_data = plt.scatter(traj[0][:,0], traj[0][:,1], c=Time[Rand_traj][:], marker='o', cmap='cool') #-1], marker='o', cmap='cool')
-# plt.plot(0.1*coins_location[:,0], 0.1*coins_location[:,1], 'xb')
-# cbar = fig.colorbar(plot_data, ticks=[10, 100, 200, 300, 400, 500])
-# cbar.ax.set_yticklabels(['time = 0', 'time = 100', 'time = 200', 'time = 300', 'time = 400', 'time = 500'])
-# plt.xlabel('x')
-# plt.ylabel('y')
-# plt.title('Processed Human data, Reward {}'.format(Reward_eval_human[Rand_traj]))
-# # plt.savefig('Figures/FiguresExpert/Processed_human_traj.eps', format='eps')
-# plt.show()  
+sigma1 = 0.5
+circle1 = ptch.Circle((6, 7.5), 2*sigma1, color='k',  fill=False)
+sigma2 = 1.1
+circle2 = ptch.Circle((-1.5, -5), 2*sigma2, color='k',  fill=False)
+sigma3 = 1.8
+circle3 = ptch.Circle((-5, 3), 2*sigma3, color='k',  fill=False)
+sigma4 = 1.3
+circle4 = ptch.Circle((4.9, -4), 2*sigma4, color='k',  fill=False)
+fig, ax = plt.subplots()
+ax.add_artist(circle1)
+ax.add_artist(circle2)
+ax.add_artist(circle3)
+ax.add_artist(circle4)
+plot_data = plt.scatter(traj[0][:,0], traj[0][:,1], c=Time[Rand_traj][:], marker='o', cmap='cool') #-1], marker='o', cmap='cool')
+plt.plot(0.1*coins_location[:,0], 0.1*coins_location[:,1], 'xb')
+cbar = fig.colorbar(plot_data, ticks=[10, 100, 200, 300, 400, 500])
+cbar.ax.set_yticklabels(['time = 0', 'time = 100', 'time = 200', 'time = 300', 'time = 400', 'time = 500'])
+plt.xlabel('x')
+plt.ylabel('y')
+plt.title('Processed Human data, Reward {}'.format(Reward_eval_human[Rand_traj]))
+# plt.savefig('Figures/FiguresExpert/Processed_human_traj.eps', format='eps')
+plt.show()  
 
 time = np.linspace(0,480,len(Real_Traj_eval_human[Rand_traj][:,0])) 
 
@@ -187,7 +203,7 @@ parser.add_argument("--save_model", action="store_true")         # Save model an
 parser.add_argument("--load_model", default="")                  # Model load file name, "" doesn't load, "default" uses file_name
 args = parser.parse_args()
 
-env = World.Foraging.env(folder, nTraj)
+env = World.Foraging.env(coins_location)
 
 # Set seeds
 env.seed(args.seed)
@@ -268,7 +284,6 @@ for i in range(N):
   TerminationBatch_torch, RewardBatch_torch] = Agent_continuous_BatchHIL.HierarchicalStochasticSampleTrajMDP(env, max_epoch, eval_episodes, 'standard', state_samples[0,:])
 
 # %%
-coins_location = World.Foraging.CoinLocation(folder, nTraj+1, 'full_coins')
 time = np.linspace(0,480,len(trajBatch_torch[0][:,0])) 
 
 index = 0

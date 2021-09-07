@@ -9,6 +9,10 @@ import numpy as np
 from sklearn.preprocessing import OneHotEncoder
 import csv
 
+Coins_location = np.load("./Expert_data/Coins_location.npy")
+Rand_traj = 2
+coins_location_standard = Coins_location[Rand_traj,:,:] 
+
 class Foraging:    
     def GeneratePsi(Simulated_states, coin_location):      
         reward = 0
@@ -107,7 +111,7 @@ class Foraging:
 
         for row in agent_data:
             True_set = np.append(True_set, np.array([[float(row[0]), float(row[2])]]), 0)
-            Training_set = np.append(Training_set, np.array([[np.round(float(row[0]),2), np.round(float(row[2]),2)]]), 0)
+            Training_set = np.append(Training_set, np.array([[np.round(float(row[0]),3), np.round(float(row[2]),3)]]), 0)
             time = np.append(time, float(row[3]))    
             
         State_space, Training_set_index = np.unique(Training_set, return_index=True, axis = 0)    
@@ -127,17 +131,18 @@ class Foraging:
             
         Real_reward = len(data_raw)
               
-        return True_Training_set, time, 0.1*Training_set_cleaned, Labels, time_cleaned, see_coin_array, coin_direction_array, reward, Real_reward
+        return True_Training_set, time, 0.1*Training_set_cleaned, Labels, time_cleaned, see_coin_array, coin_direction_array, reward, Real_reward, coin_location
             
     
     class env:
-        def __init__(self,  Folder, expert_traj, init_state = np.array([0,0,0,0]), version_coins = 'full_coins'):
+        def __init__(self,  coins_location = coins_location_standard, init_state = np.array([0,0,0,0]), max_episode_steps = 3000):
             self.state = init_state
-            self.Folder = Folder
-            self.expert_traj = expert_traj
-            self.version_coins = version_coins
-            self.coin_location = 0.1*Foraging.CoinLocation(Folder, expert_traj+1, self.version_coins)
+            self.coin_initial = 0.1*coins_location_standard
+            self.coin_location = 0.1*coins_location_standard
             self.observation_space = np.array([len(self.state)])
+            
+            self._max_episode_steps = max_episode_steps
+            self.step_counter = 0
               
         class action_space:
             def high():
@@ -150,12 +155,14 @@ class Foraging:
         def reset(self, version = 'standard', init_state = np.array([0,0,0,0])):
             if version == 'standard':
                 self.state = init_state
-                self.coin_location = 0.1*Foraging.CoinLocation(self.Folder, self.expert_traj+1, self.version_coins)
+                self.coin_location = self.coin_initial
+                self.step_counter = 0
             else:
                 state = 0.1*np.random.randint(-100,100,2)
                 init_state = np.concatenate((state, np.array([0,0])))
                 self.state = init_state
-                self.coin_location = 0.1*Foraging.CoinLocation(self.Folder, self.expert_traj+1, self.version_coins)
+                self.coin_location = self.coin_initial
+                self.step_counter = 0
                 
             return self.state
                 
@@ -164,12 +171,12 @@ class Foraging:
             np.random.seed(self.seed)
     
         def step(self, action):
-            
+            self.step_counter += 1
             r=0
             state_partial = self.state[0:2]
             # given action, draw next state
             angle = action[0]
-            step = 0.017
+            step = 0.1
             state_plus1_partial = np.zeros((2,))
             state_plus1_partial[0] = state_partial[0] + step*np.cos(angle)
             state_plus1_partial[1] = state_partial[1] + step*np.sin(angle)
@@ -207,5 +214,9 @@ class Foraging:
                     
             state_plus1 = np.concatenate((state_plus1_partial, [psi], [coin_direction]))
             self.state = state_plus1
+            if self.step_counter >= self._max_episode_steps:
+                done = True
+            else:
+                done = False
             
-            return state_plus1, r, False, False
+            return state_plus1, r, done, False
