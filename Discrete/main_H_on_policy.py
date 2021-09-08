@@ -140,8 +140,8 @@ def HRL(env, args, seed):
          	
     # Evaluate untrained policy
     evaluation_HRL = []
-    # avg_reward = evaluate_H(seed, Agent_HRL, env, args.evaluation_max_n_steps, args.evaluation_episodes, 'standard', TrainingSet[0,:])
-    # evaluation_HRL.append(avg_reward)
+    avg_reward = evaluate_H(seed, Agent_HRL, env, args.evaluation_max_n_steps, args.evaluation_episodes, 'standard', TrainingSet[0,:])
+    evaluation_HRL.append(avg_reward)
     
     
     for i in range(int(args.max_iter)):
@@ -200,9 +200,9 @@ if __name__ == "__main__":
     #General
     parser.add_argument("--number_options", default=2, type=int)     # number of options
     parser.add_argument("--policy", default="HPPO")                   # Policy name (TD3, DDPG or OurDDPG)
-    parser.add_argument("--seed", default=21, type=int)               # Sets Gym, PyTorch and Numpy seeds
+    parser.add_argument("--seed", default=10, type=int)               # Sets Gym, PyTorch and Numpy seeds
     parser.add_argument("--env", default="Foraging")               # Sets Gym, PyTorch and Numpy seeds
-    parser.add_argument("--number_steps_per_iter", default=6000, type=int) # Time steps initial random policy is used 25e3
+    parser.add_argument("--number_steps_per_iter", default=30000, type=int) # Time steps initial random policy is used 25e3
     parser.add_argument("--eval_freq", default=1, type=int)          # How often (time steps) we evaluate
     parser.add_argument("--max_iter", default=200, type=int)    # Max time steps to run environment
     parser.add_argument("--coins", default=2, type=int)

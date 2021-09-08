@@ -153,14 +153,14 @@ class H_PPO:
         self.states = []
         self.actions = []
         self.options = []
-        self.returns =  [[] for i in range(self.option_dim)]
-        self.advantage = [[] for i in range(self.option_dim)]
+        self.returns =  []
+        self.advantage = []
         self.gammas = []
         while step < self.num_steps_per_rollout: 
             episode_states = []
             episode_actions = []
             episode_options = []
-            episode_rewards = [[] for i in range(self.option_dim)]
+            episode_rewards = []
             episode_gammas = []
             episode_lambdas = []    
             state, done = env.reset(reset, init_state), False
@@ -187,11 +187,7 @@ class H_PPO:
                 
                 state, reward, done, _ = env.step(action)
                 
-                for i in range(self.option_dim):
-                    if i == option:
-                        episode_rewards[i].append(reward)
-                    else:
-                        episode_rewards[i].append(0)
+                episode_rewards.append(reward)
                         
                 termination = H_PPO.select_termination(self, state, option)
                 next_option = H_PPO.select_option(self, state, termination, option)
@@ -220,30 +216,21 @@ class H_PPO:
                 episode_actions = F.one_hot(episode_actions, num_classes=self.action_dim)
                 episode_rewards = -torch.log(Discriminator(episode_states, episode_actions)).squeeze().detach()
                 
-            episode_discounted_rewards = [[] for i in range(self.option_dim)]
-            episode_discounted_returns = [[] for i in range(self.option_dim)]
-            episode_returns = [[] for i in range(self.option_dim)]
-            for k in range(self.option_dim):
-                episode_discounted_rewards[k] = episode_gammas*episode_rewards[k, :]
-                episode_discounted_returns[k] = torch.FloatTensor([sum(episode_discounted_rewards[k][i:]) for i in range(t)])
-                episode_returns[k] = episode_discounted_returns[k]/episode_gammas
+            episode_discounted_rewards = episode_gammas*episode_rewards
+            episode_discounted_returns = torch.FloatTensor([sum(episode_discounted_rewards[i:]) for i in range(t)])
+            episode_returns = episode_discounted_returns/episode_gammas
             
             self.returns.append(episode_returns)
             self.value_function.eval()
             episode_options = F.one_hot(episode_options, num_classes=self.option_dim)
             current_values = self.value_function(episode_states, episode_options).detach()
             next_values = torch.cat((self.value_function(episode_states, episode_options)[1:], torch.FloatTensor([[0.]]))).detach()
-            
-            
-            episode_deltas = [[] for i in range(self.option_dim)]
-            episode_advantage = [[] for i in range(self.option_dim)]
-            for k in range(self.option_dim):
-                episode_deltas[k] = episode_rewards[k, :].unsqueeze(-1) + self.gae_gamma*next_values - current_values
-                episode_advantage[k] = torch.FloatTensor([((episode_gammas*episode_lambdas)[:t-j].unsqueeze(-1)*episode_deltas[k][j:]).sum() for j in range(t)])
+            episode_deltas = episode_rewards.unsqueeze(-1) + self.gae_gamma*next_values - current_values
+            episode_advantage = torch.FloatTensor([((episode_gammas*episode_lambdas)[:t-j].unsqueeze(-1)*episode_deltas[j:]).sum() for j in range(t)])
             
             self.advantage.append(episode_advantage)
             self.gammas.append(episode_gammas)
-            
+                
         rollout_states = torch.FloatTensor(self.states)
         rollout_actions = torch.LongTensor(np.array(self.actions))
         rollout_options = torch.LongTensor(np.array(self.options))
@@ -255,61 +242,68 @@ class H_PPO:
         
         rollout_states = torch.FloatTensor(self.states)
         rollout_actions = torch.LongTensor(np.array(self.actions))
-        rollout_gammas = torch.cat(self.gammas)  
+        rollout_options = torch.LongTensor(np.array(self.options))
+        rollout_gammas = torch.cat(self.gammas) 
+        rollout_returns = torch.cat(self.returns)
+        rollout_advantage = torch.cat(self.advantage)
         
-        rollout_returns = [[] for i in range(self.option_dim)]
-        rollout_advantage = [[] for i in range(self.option_dim)]
+        index_op = []
+        for option in range(self.option_dim):
+            index_op.append(np.where(option==rollout_options)[0])
         
-        for l in range(self.option_dim):
-            returns_temp = []
-            advantage_temp = []
-            for k in range(len(self.returns)):
-                returns_temp.append(self.returns[k][l])
-                advantage_temp.append(self.advantage[k][l])
+        for option in range(self.option_dim):
+            
+            states_op = rollout_states[index_op[option]]
+            option_vector = rollout_options[index_op[option]]
+            actions_op = rollout_actions[index_op[option]]
+            returns_op = rollout_returns[index_op[option]]
+            advantage_op = rollout_advantage[index_op[option]]
+            gammas_op = rollout_gammas[index_op[option]]  
+            
+            advantage_op = ((advantage_op-advantage_op.mean())/advantage_op.std()).reshape(-1,1)
+            
+            self.pi_lo[option].eval()
+            old_log_prob, old_log_prob_rollout = self.pi_lo[option].sample_log(states_op, actions_op)
+            old_log_prob = old_log_prob.detach()
+            old_log_prob_rollout = old_log_prob_rollout.detach()
+            
+            self.value_function.train()
+            self.pi_lo[option].train()
+            
+            num_steps_per_option = len(states_op)
+            
+            max_steps = self.num_epochs * (num_steps_per_option // self.minibatch_size)
+            
+            for _ in range(max_steps):
                 
-            rollout_returns[l] = torch.cat(returns_temp)
-            rollout_advantage[l] = torch.cat(advantage_temp)      
-        
-        rollout_advantage = ((rollout_advantage-rollout_advantage.mean())/rollout_advantage.std()).reshape(-1,1)
-        
-        self.actor.eval()
-        old_log_prob, old_log_prob_rollout = self.actor.sample_log(rollout_states, rollout_actions)
-        old_log_prob = old_log_prob.detach()
-        old_log_prob_rollout = old_log_prob_rollout.detach()
-        
-        self.value_function.train()
-        self.actor.train()
-        
-        max_steps = self.num_epochs * (self.num_steps_per_rollout // self.minibatch_size)
-        
-        for _ in range(max_steps):
-            
-            minibatch_indices = np.random.choice(range(self.num_steps_per_rollout), self.minibatch_size, False)
-            batch_states=rollout_states[minibatch_indices]
-            batch_actions = rollout_actions[minibatch_indices]
-            batch_returns = rollout_returns[minibatch_indices]
-            batch_advantage = rollout_advantage[minibatch_indices]
-            batch_gammas = rollout_gammas[minibatch_indices]       
-            
-            log_prob, log_prob_rollout = self.actor.sample_log(batch_states, batch_actions)
-            batch_old_log_pi = old_log_prob_rollout[minibatch_indices]
-            
-            r = torch.exp(log_prob_rollout - batch_old_log_pi)
-            L_clip = torch.minimum(r*batch_advantage, torch.clip(r, 1-self.epsilon, 1+self.epsilon)*batch_advantage)
-            L_vf = (self.value_function(batch_states).squeeze() - batch_returns)**2
-            
-            if Entropy:
-                S = (-1)*torch.sum(torch.exp(log_prob)*log_prob, 1)
-            else:
-                S = torch.zeros_like(torch.sum(torch.exp(log_prob)*log_prob, 1))
+                minibatch_indices = np.random.choice(range(num_steps_per_option), self.minibatch_size, False)
+                batch_states = states_op[minibatch_indices]
+                batch_options = option_vector[minibatch_indices]
+                batch_actions = actions_op[minibatch_indices]
+                batch_returns = returns_op[minibatch_indices]
+                batch_advantage = advantage_op[minibatch_indices]
+                batch_gammas = gammas_op[minibatch_indices]       
                 
-            self.optimizer_value_function.zero_grad()
-            self.optimizer_actor.zero_grad()
-            loss = (-1) * (L_clip - self.c1 * L_vf + self.c2 * S).mean()
-            loss.backward()
-            self.optimizer_value_function.step()
-            self.optimizer_actor.step()        
-        
+                log_prob, log_prob_rollout = self.pi_lo[option].sample_log(batch_states, batch_actions)
+                batch_old_log_pi = old_log_prob_rollout[minibatch_indices]
+                
+                r = torch.exp(log_prob_rollout - batch_old_log_pi)
+                L_clip = torch.minimum(r*batch_advantage, torch.clip(r, 1-self.epsilon, 1+self.epsilon)*batch_advantage)
+                batch_options = F.one_hot(batch_options, num_classes=self.option_dim)
+                L_vf = (self.value_function(batch_states, batch_options).squeeze() - batch_returns)**2
+                
+                if Entropy:
+                    S = (-1)*torch.sum(torch.exp(log_prob)*log_prob, 1)
+                else:
+                    S = torch.zeros_like(torch.sum(torch.exp(log_prob)*log_prob, 1))
+                    
+                self.optimizer_value_function.zero_grad()
+                self.pi_lo_optimizer[option].zero_grad()
+                loss = (-1) * (L_clip - self.c1 * L_vf + self.c2 * S).mean()
+                loss.backward()
+                self.optimizer_value_function.step()
+                self.pi_lo_optimizer[option].step()  
+                
         
     def save_actor(self, filename):
             torch.save(self.pi_hi.state_dict(), filename + "_pi_hi")
