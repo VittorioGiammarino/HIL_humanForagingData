@@ -61,6 +61,7 @@ class H_PPO:
         self.Total_iter = 0
         self.states = []
         self.actions = []
+        self.options = []
         self.returns = []
         self.advantage = [[] for i in range(option_dim)]
         self.gammas = []

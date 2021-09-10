@@ -167,7 +167,7 @@ def HRL(env, args, seed):
             avg_reward = evaluate_H(seed, Agent_HRL, env, args.evaluation_max_n_steps, args.evaluation_episodes, 'standard', TrainingSet[0,:])
             evaluation_HRL.append(avg_reward)      
              
-    return evaluations, policy
+    return evaluation_HRL, Agent_HRL
     
     
 def train(env, args, seed): 
@@ -177,8 +177,8 @@ def train(env, args, seed):
     torch.manual_seed(seed)
     np.random.seed(seed)
     
-    # if args.HIL:
-    #     HIL(env, args, seed)
+    if args.HIL:
+        HIL(env, args, seed)
         
     evaluations, policy = HRL(env, args, seed)
         
