@@ -23,6 +23,8 @@ import H_PPO
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+#%%
+
 def HIL(env, args, seed):
     
     Trajectories = np.load("./Expert_data/Trajectories.npy", allow_pickle=True).tolist()
@@ -159,7 +161,7 @@ def HRL(env, args, seed):
         #     policy.train(Entropy = True)
             
         # else:
-        rollout_states, rollout_actions, rollout_options = Agent_HRL.GAE(env)
+        rollout_states, rollout_actions, rollout_options, rollout_terminations = Agent_HRL.GAE(env)
         Agent_HRL.train(Entropy = True)
              
         # Evaluate episode
@@ -177,8 +179,8 @@ def train(env, args, seed):
     torch.manual_seed(seed)
     np.random.seed(seed)
     
-    if args.HIL:
-        HIL(env, args, seed)
+    # if args.HIL:
+    #     HIL(env, args, seed)
         
     evaluations, policy = HRL(env, args, seed)
         
@@ -237,7 +239,7 @@ if __name__ == "__main__":
         print("---------------------------------------")
         
     else:
-        file_name = f"{args.policy}_HIL_{args.HIL}_HGAIL_{args.HGAIL}_Mixed_{args.Mixed_HGAIL}_{args.env}_{args.seed}"
+        file_name = f"{args.policy}_HIL_{args.HIL}_delayed_2_{args.env}_{args.seed}"
         print("---------------------------------------")
         print(f"Policy: {args.policy}, HIL: {args.HIL}, HGAIL: {args.HGAIL}, Mixed: {args.Mixed_HGAIL}, Env: {args.env}, Seed: {args.seed}")
         print("---------------------------------------")
@@ -280,6 +282,6 @@ if __name__ == "__main__":
         evaluations, policy = train(env, args, args.seed)
         if args.save_model: 
             np.save(f"./results/HRL/evaluation_{file_name}", evaluations)
-            policy.save_actor(f"./models/HRL/{file_name}")
+            policy.save_actor(f"./models/HRL/{file_name}/{file_name}")
     
 

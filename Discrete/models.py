@@ -71,6 +71,30 @@ class SoftmaxHierarchicalActor:
             b = F.relu(self.l2(b))
             return self.lS(self.l3(b))            
         
+        def sample(self, state):
+            self.log_Soft = nn.LogSoftmax(dim=1)
+            b = self.l1(state)
+            b = F.relu(self.l2(b))
+            log_prob = self.log_Soft(self.l3(b)) 
+            
+            prob = self.forward(state)
+            m = Categorical(prob)
+            termination = m.sample()
+            
+            log_prob_sampled = log_prob[torch.arange(len(termination)), termination]
+            
+            return termination, log_prob_sampled.reshape(-1,1)
+        
+        def sample_log(self, state, termination):
+            self.log_Soft = nn.LogSoftmax(dim=1)
+            b = self.l1(state)
+            b = F.relu(self.l2(b))
+            log_prob = self.log_Soft(self.l3(b)) 
+                        
+            log_prob_sampled = log_prob[torch.arange(len(termination)), termination]
+            
+            return log_prob, log_prob_sampled.reshape(-1,1)
+        
     class NN_PI_HI(nn.Module):
         def __init__(self, state_dim, option_dim):
             super(SoftmaxHierarchicalActor.NN_PI_HI, self).__init__()
@@ -86,6 +110,30 @@ class SoftmaxHierarchicalActor:
             o = self.l1(state)
             o = F.relu(self.l2(o))
             return self.lS(self.l3(o))
+        
+        def sample(self, state):
+            self.log_Soft = nn.LogSoftmax(dim=1)
+            o = self.l1(state)
+            o = F.relu(self.l2(o))
+            log_prob = self.log_Soft(self.l3(o)) 
+            
+            prob = self.forward(state)
+            m = Categorical(prob)
+            option = m.sample()
+            
+            log_prob_sampled = log_prob[torch.arange(len(option)), option]
+            
+            return option, log_prob_sampled.reshape(-1,1)
+        
+        def sample_log(self, state, option):
+            self.log_Soft = nn.LogSoftmax(dim=1)
+            o = self.l1(state)
+            o = F.relu(self.l2(o))
+            log_prob = self.log_Soft(self.l3(o)) 
+                        
+            log_prob_sampled = log_prob[torch.arange(len(option)), option]
+            
+            return log_prob, log_prob_sampled.reshape(-1,1)
         
 class Critic(nn.Module):
 	def __init__(self, state_dim, action_dim, option_dim):

@@ -10,9 +10,6 @@ from models import Critic
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Implementation of Twin Delayed Deep Deterministic Policy Gradients (TD3)
-# Paper: https://arxiv.org/abs/1802.09477
-
 
 class H_SAC(object):
     def __init__(self, state_dim, action_dim, option_dim, termination_dim, encoding_info = None, 
