@@ -239,7 +239,7 @@ if __name__ == "__main__":
         print("---------------------------------------")
         
     else:
-        file_name = f"{args.policy}_HIL_{args.HIL}_delayed_2_{args.env}_{args.seed}"
+        file_name = f"{args.policy}_HIL_{args.HIL}_delayed_3_{args.env}_{args.seed}"
         print("---------------------------------------")
         print(f"Policy: {args.policy}, HIL: {args.HIL}, HGAIL: {args.HGAIL}, Mixed: {args.Mixed_HGAIL}, Env: {args.env}, Seed: {args.seed}")
         print("---------------------------------------")

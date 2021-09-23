@@ -53,7 +53,7 @@ for i in range(8):
     # with open(f'results/HRL/evaluation_HPPO_HIL_True_HGAIL_False_Mixed_False_Foraging_{i}.npy', 'rb') as f:
     #     HPPO_IL.append(np.load(f, allow_pickle=True))
         
-    with open(f'results/HRL/evaluation_HPPO_HIL_True_delayed_Foraging_{i}.npy', 'rb') as f:
+    with open(f'results/HRL/evaluation_HPPO_HIL_True_delayed_2_Foraging_{i}.npy', 'rb') as f:
         HPPO_IL.append(np.load(f, allow_pickle=True))
             
 Real_Reward_eval_human = np.load("./Expert_data/Real_Reward_eval_human.npy", allow_pickle=True).tolist()    

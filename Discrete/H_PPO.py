@@ -17,7 +17,7 @@ from models import Value_net_H
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class H_PPO:
-    def __init__(self, state_dim, action_dim, option_dim, termination_dim, encoding_info = None, pi_b_freq=20, pi_hi_freq=20,
+    def __init__(self, state_dim, action_dim, option_dim, termination_dim, encoding_info = None, pi_b_freq=5, pi_hi_freq=5,
                  num_steps_per_rollout=15000, l_rate_pi_lo=3e-4, l_rate_pi_hi=3e-4 , l_rate_pi_b=3e-4, l_rate_critic=3e-4, 
                  gae_gamma = 0.99, gae_lambda = 0.99, epsilon = 0.2, c1 = 1, c2 = 1e-2, minibatch_size=64, 
                  num_epochs_pi_lo=10, num_epochs_pi_b=10, num_epochs_pi_hi=10, lambda_gail = 1e-1, eta = 0.001):
