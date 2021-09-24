@@ -280,6 +280,11 @@ class H_PPO:
     
     def train(self, Entropy = False):
         
+        if self.Total_iter % 50 == 0:
+            self.pi_b_freq = 2*self.pi_b_freq 
+            self.pi_hi_freq = 2*self.pi_hi_freq
+            
+               
         rollout_states = torch.FloatTensor(self.states)
         rollout_actions = torch.LongTensor(np.array(self.actions))
         rollout_options = torch.LongTensor(np.array(self.options))
