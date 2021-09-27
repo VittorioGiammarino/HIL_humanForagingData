@@ -40,6 +40,10 @@ PPO_IL = []
 TRPO_IL = []
 UATRPO_IL = []
 HPPO_IL = []
+HPPO_IL_delay_20_iter = []
+HPPO_IL_delay_10_iter = []
+HPPO_IL_delay_5_iter = []
+
 for i in range(8):
     with open(f'results/FlatRL/evaluation_PPO_IL_True_GAIL_False_Mixed_False_Foraging_{i}.npy', 'rb') as f:
         PPO_IL.append(np.load(f, allow_pickle=True))
@@ -53,11 +57,26 @@ for i in range(8):
     # with open(f'results/HRL/evaluation_HPPO_HIL_True_HGAIL_False_Mixed_False_Foraging_{i}.npy', 'rb') as f:
     #     HPPO_IL.append(np.load(f, allow_pickle=True))
         
-    with open(f'results/HRL/evaluation_HPPO_HIL_True_delayed_4_Foraging_{i}.npy', 'rb') as f:
-        HPPO_IL.append(np.load(f, allow_pickle=True))
+    with open(f'results/HRL/evaluation_HPPO_HIL_True_delayed_2_Foraging_{i}.npy', 'rb') as f:
+        HPPO_IL_delay_20_iter.append(np.load(f, allow_pickle=True))
+        
+    with open(f'results/HRL/evaluation_HPPO_HIL_True_delayed_5_Foraging_{i}.npy', 'rb') as f:
+        HPPO_IL_delay_10_iter.append(np.load(f, allow_pickle=True))
+        
+    with open(f'results/HRL/evaluation_HPPO_HIL_True_delayed_3_Foraging_{i}.npy', 'rb') as f:
+        HPPO_IL_delay_5_iter.append(np.load(f, allow_pickle=True))
             
 Real_Reward_eval_human = np.load("./Expert_data/Real_Reward_eval_human.npy", allow_pickle=True).tolist()    
 threshold = np.mean(Real_Reward_eval_human)
+
+# notes:
+    # first HPPO keeps the hierarchy constant and optimizes low level
+    # delayed bad hyperparmater (number of updates) choice
+    # delayed 2 updates both b and hi every 20 iterations for 10 times
+    # delayed 3 updates both b and hi every 5 iterations for 10 times
+    # delayed 4 updates both b and hi adaptively for 10 times
+    # delayed 5 updates both b and hi every 10 iterations for 10 times
+    # delayed 6 updates both b and hi every 30 iterations for 10 times
 
     
 # %%
@@ -87,6 +106,8 @@ ax.set_xlabel('Steps')
 ax.set_ylabel('Reward')
 ax.set_title('PPO')
 plt.savefig('Figures/PPO.pdf', format='pdf')
+
+HPPO_IL = HPPO_IL_delay_20_iter
 
 fig, ax = plt.subplots()
 clrs = sns.color_palette("husl", 9)
@@ -164,14 +185,23 @@ plt.savefig('Figures/UATRPO.pdf', format='pdf')
 PPO_mean = np.mean(np.array(PPO_IL),0)
 PPO_std = np.std(np.array(PPO_IL),0)
 
-HPPO_mean = np.mean(np.array(HPPO_IL),0)
-HPPO_std = np.std(np.array(HPPO_IL),0)
+HPPO_IL_delay_5_iter_mean = np.mean(np.array(HPPO_IL_delay_5_iter),0)
+HPPO_IL_delay_5_iter_std = np.std(np.array(HPPO_IL_delay_5_iter),0)
+
+HPPO_IL_delay_10_iter_mean = np.mean(np.array(HPPO_IL_delay_10_iter),0)
+HPPO_IL_delay_10_iter_std = np.std(np.array(HPPO_IL_delay_10_iter),0)
+
+HPPO_IL_delay_20_iter_mean = np.mean(np.array(HPPO_IL_delay_20_iter),0)
+HPPO_IL_delay_20_iter_std = np.std(np.array(HPPO_IL_delay_20_iter),0)
 
 TRPO_mean = np.mean(np.array(TRPO_IL),0)
 TRPO_std = np.std(np.array(TRPO_IL),0)
 
 UATRPO_mean = np.mean(np.array(UATRPO_IL),0)
 UATRPO_std = np.std(np.array(UATRPO_IL),0)
+
+HPPO_mean = HPPO_IL_delay_10_iter_mean
+HPPO_std = HPPO_IL_delay_10_iter_std
 
 fig, ax = plt.subplots()
 clrs = sns.color_palette("husl", 9)
@@ -199,13 +229,13 @@ plt.savefig('Figures/on_policy_comparison.pdf', format='pdf')
 fig, ax = plt.subplots()
 clrs = sns.color_palette("husl", 9)
 ax.plot(steps, PPO_mean, label='PPO', c=clrs[0])
-ax.fill_between(steps, PPO_mean-PPO_std, PPO_mean+PPO_std, alpha=0.2, facecolor=clrs[0])
-ax.plot(steps, HPPO_mean, label='HPPO', c=clrs[4])
-ax.fill_between(steps, HPPO_mean-HPPO_std, HPPO_mean+HPPO_std, alpha=0.2, facecolor=clrs[4])
-# ax.plot(steps, TRPO_mean, label='TRPO', c=clrs[1])
-# ax.fill_between(steps, TRPO_mean-TRPO_std, TRPO_mean+TRPO_std, alpha=0.2, facecolor=clrs[1])
-# ax.plot(steps, UATRPO_mean, label='UATRPO', c=clrs[3])
-# ax.fill_between(steps, UATRPO_mean-UATRPO_std, UATRPO_mean+UATRPO_std, alpha=0.2, facecolor=clrs[3])
+# ax.fill_between(steps, PPO_mean-PPO_std, PPO_mean+PPO_std, alpha=0.2, facecolor=clrs[0])
+ax.plot(steps, HPPO_IL_delay_5_iter_mean, label='HPPO 5 iter delay', c=clrs[4])
+# ax.fill_between(steps, HPPO_IL_delay_5_iter_mean-HPPO_IL_delay_5_iter_std, HPPO_IL_delay_5_iter_mean+HPPO_IL_delay_5_iter_std, alpha=0.2, facecolor=clrs[4])
+ax.plot(steps, HPPO_IL_delay_10_iter_mean, label='HPPO 10 iter delay', c=clrs[1])
+# ax.fill_between(steps, HPPO_IL_delay_10_iter_mean-HPPO_IL_delay_10_iter_std, HPPO_IL_delay_10_iter_mean+HPPO_IL_delay_10_iter_std, alpha=0.2, facecolor=clrs[1])
+ax.plot(steps, HPPO_IL_delay_20_iter_mean, label='HPPO 20 iter delay', c=clrs[3])
+# ax.fill_between(steps, HPPO_IL_delay_20_iter_mean-HPPO_IL_delay_20_iter_std, HPPO_IL_delay_20_iter_mean+HPPO_IL_delay_20_iter_std, alpha=0.2, facecolor=clrs[3])
 ax.plot(steps, Human_average_performance, "--", label='Humans', c=clrs[2])
 box = ax.get_position()
 ax.set_position([box.x0, box.y0 + box.height * 0.1,
