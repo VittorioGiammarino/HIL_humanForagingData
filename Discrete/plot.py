@@ -40,6 +40,7 @@ PPO_IL = []
 TRPO_IL = []
 UATRPO_IL = []
 HPPO_IL = []
+HPPO_IL_delay_30_iter = []
 HPPO_IL_delay_20_iter = []
 HPPO_IL_delay_10_iter = []
 HPPO_IL_delay_5_iter = []
@@ -65,6 +66,9 @@ for i in range(8):
         
     with open(f'results/HRL/evaluation_HPPO_HIL_True_delayed_3_Foraging_{i}.npy', 'rb') as f:
         HPPO_IL_delay_5_iter.append(np.load(f, allow_pickle=True))
+        
+    with open(f'results/HRL/evaluation_HPPO_HIL_True_delayed_6_Foraging_{i}.npy', 'rb') as f:
+        HPPO_IL_delay_30_iter.append(np.load(f, allow_pickle=True))
             
 Real_Reward_eval_human = np.load("./Expert_data/Real_Reward_eval_human.npy", allow_pickle=True).tolist()    
 threshold = np.mean(Real_Reward_eval_human)
@@ -194,6 +198,9 @@ HPPO_IL_delay_10_iter_std = np.std(np.array(HPPO_IL_delay_10_iter),0)
 HPPO_IL_delay_20_iter_mean = np.mean(np.array(HPPO_IL_delay_20_iter),0)
 HPPO_IL_delay_20_iter_std = np.std(np.array(HPPO_IL_delay_20_iter),0)
 
+HPPO_IL_delay_30_iter_mean = np.mean(np.array(HPPO_IL_delay_30_iter),0)
+HPPO_IL_delay_30_iter_std = np.std(np.array(HPPO_IL_delay_30_iter),0)
+
 TRPO_mean = np.mean(np.array(TRPO_IL),0)
 TRPO_std = np.std(np.array(TRPO_IL),0)
 
@@ -236,6 +243,8 @@ ax.plot(steps, HPPO_IL_delay_10_iter_mean, label='HPPO 10 iter delay', c=clrs[1]
 # ax.fill_between(steps, HPPO_IL_delay_10_iter_mean-HPPO_IL_delay_10_iter_std, HPPO_IL_delay_10_iter_mean+HPPO_IL_delay_10_iter_std, alpha=0.2, facecolor=clrs[1])
 ax.plot(steps, HPPO_IL_delay_20_iter_mean, label='HPPO 20 iter delay', c=clrs[3])
 # ax.fill_between(steps, HPPO_IL_delay_20_iter_mean-HPPO_IL_delay_20_iter_std, HPPO_IL_delay_20_iter_mean+HPPO_IL_delay_20_iter_std, alpha=0.2, facecolor=clrs[3])
+ax.plot(steps, HPPO_IL_delay_30_iter_mean, label='HPPO 30 iter delay', c=clrs[6])
+# ax.fill_between(steps, HPPO_IL_delay_30_iter_mean-HPPO_IL_delay_30_iter_std, HPPO_IL_delay_30_iter_mean+HPPO_IL_delay_30_iter_std, alpha=0.2, facecolor=clrs[6])
 ax.plot(steps, Human_average_performance, "--", label='Humans', c=clrs[2])
 box = ax.get_position()
 ax.set_position([box.x0, box.y0 + box.height * 0.1,
@@ -249,5 +258,61 @@ ax.set_ylabel('Reward')
 ax.set_title('Comparison')
 plt.savefig('Figures/PPO_vs_HPPO.pdf', format='pdf')
 
-# %%
+# %% Plot HIL
+
+HIL_2_options_supervised = []
+
+for i in range(8):        
+    with open(f'results/HRL/HIL_Foraging_{i}.npy', 'rb') as f:
+        HIL_2_options_supervised.append(np.load(f, allow_pickle=True))
+        
+Real_Reward_eval_human = np.load("./Expert_data/Real_Reward_eval_human.npy", allow_pickle=True).tolist()    
+threshold = np.mean(Real_Reward_eval_human)
+
+HIL_2_options_supervised_mean = np.mean(np.array(HIL_2_options_supervised),0)
+HIL_2_options_supervised_std= np.std(np.array(HIL_2_options_supervised),0)
+
+BW_iters = np.linspace(0,10,len(HIL_2_options_supervised[0]))
+Human_average_performance = threshold*np.ones((len(BW_iters),))
+
+fig, ax = plt.subplots()
+clrs = sns.color_palette("husl", 9)
+ax.plot(BW_iters, HIL_2_options_supervised[0], label='seed 0', c=clrs[0])
+ax.plot(BW_iters, HIL_2_options_supervised[1], label='seed 1', c=clrs[1])
+ax.plot(BW_iters, HIL_2_options_supervised[2], label='seed 2', c=clrs[2])
+ax.plot(BW_iters, HIL_2_options_supervised[3], label='seed 3', c=clrs[3])
+ax.plot(BW_iters, HIL_2_options_supervised[4], label='seed 4', c=clrs[4])
+ax.plot(BW_iters, HIL_2_options_supervised[5], label='seed 5', c=clrs[5])
+ax.plot(BW_iters, HIL_2_options_supervised[6], label='seed 6', c=clrs[6])
+ax.plot(BW_iters, HIL_2_options_supervised[7], label='seed 7', c=clrs[7])
+ax.plot(BW_iters, Human_average_performance, "--", label='Humans', c=clrs[8])
+box = ax.get_position()
+ax.set_position([box.x0, box.y0 + box.height * 0.20,
+                 box.width, box.height * 0.8])
+# Put a legend below current axis
+ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.2),
+          fancybox=True, shadow=True, ncol=5)
+ax.set_ylim([0,300])
+ax.set_xlabel('Iterations')
+ax.set_ylabel('Reward')
+ax.set_title('HIL 2 options')
+plt.savefig('Figures/HIL_2_options_supervised.pdf', format='pdf')
+
+fig, ax = plt.subplots()
+clrs = sns.color_palette("husl", 9)
+ax.plot(BW_iters, HIL_2_options_supervised_mean, label='HIL 2 options supervised', c=clrs[0])
+ax.fill_between(BW_iters, HIL_2_options_supervised_mean-HIL_2_options_supervised_std, HIL_2_options_supervised_mean+HIL_2_options_supervised_std, alpha=0.2, facecolor=clrs[0])
+ax.plot(BW_iters, Human_average_performance, "--", label='Humans', c=clrs[8])
+box = ax.get_position()
+ax.set_position([box.x0, box.y0 + box.height * 0.1,
+                 box.width, box.height * 0.9])
+# Put a legend below current axis
+ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15),
+          fancybox=True, shadow=True, ncol=5)
+ax.set_ylim([0,300])
+ax.set_xlabel('Steps')
+ax.set_ylabel('Reward')
+ax.set_title('Comparison')
+plt.savefig('Figures/HIL_comparison.pdf', format='pdf')
+
 

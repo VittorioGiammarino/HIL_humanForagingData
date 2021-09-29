@@ -570,7 +570,7 @@ class Foraging:
             self._max_episode_steps = max_episode_steps
             self.step_counter = 0
                 
-        def seed(self, seed):
+        def Seed(self, seed):
             self.seed = seed
             np.random.seed(self.seed)
                 

@@ -29,6 +29,10 @@ def HIL(env, args, seed):
     
     Trajectories = np.load("./Expert_data/Trajectories.npy", allow_pickle=True).tolist()
     Rotation = np.load("./Expert_data/Rotation.npy", allow_pickle=True).tolist()
+        
+    print("---------------------------------------")
+    print(f"HIL: {args.HIL}, Traj: {args.coins}, nOptions: {args.number_options}, Supervised: {args.pi_hi_supervised}, Seed: {args.seed}")
+    print("---------------------------------------")
     
     TrainingSet = Trajectories[args.coins]
     Labels = Rotation[args.coins]
@@ -56,15 +60,33 @@ def HIL(env, args, seed):
     Agent_BatchHIL_torch = BatchBW(**kwargs)
     
     if args.pi_hi_supervised:
-        epochs = args.pi_hi_supervised_epochs
-        Options = state_samples[:,2]
-        Agent_BatchHIL_torch.pretrain_pi_hi(epochs, Options)
-        Labels_b = Agent_BatchHIL_torch.prepare_labels_pretrain_pi_b(Options)
-        for i in range(args.number_options):
-            Agent_BatchHIL_torch.pretrain_pi_b(epochs, Labels_b[i], i)
+        if args.number_options == 2:
+            epochs = args.pi_hi_supervised_epochs
+            Options = np.copy(state_samples[:,2])
+            Agent_BatchHIL_torch.pretrain_pi_hi(epochs, Options)
+            Labels_b = Agent_BatchHIL_torch.prepare_labels_pretrain_pi_b(Options)
+            for i in range(args.number_options):
+                Agent_BatchHIL_torch.pretrain_pi_b(epochs, Labels_b[i], i)
+                
+        if args.number_options == 3:
+            epochs = args.pi_hi_supervised_epochs
+            Options = np.copy(state_samples[:,2])
+            
+            for s in range(len(Options)):
+                if state_samples[s,1] > 6.5 or state_samples[s,1] < -6.5 or state_samples[s,0] > 6.5 or state_samples[s,0] < -6.5:
+                    if Options[s] == 0:
+                        Options[s] = 2            
+            
+            Agent_BatchHIL_torch.pretrain_pi_hi(epochs, Options)
+            Labels_b = Agent_BatchHIL_torch.prepare_labels_pretrain_pi_b(Options)
+            for i in range(args.number_options):
+                Agent_BatchHIL_torch.pretrain_pi_b(epochs, Labels_b[i], i)
+            
 
     Loss = 100000
     evaluation_HIL = []
+    avg_reward = evaluate_H(seed, Agent_BatchHIL_torch, env, args.evaluation_max_n_steps, args.evaluation_episodes, 'standard', TrainingSet[0,:])
+    evaluation_HIL.append(avg_reward)
     for i in range(args.N_iterations):
         print(f"Iteration {i+1}/{args.N_iterations}")
         loss = Agent_BatchHIL_torch.Baum_Welch()
@@ -75,8 +97,12 @@ def HIL(env, args, seed):
         evaluation_HIL.append(avg_reward)
         
     # Save
-    np.save(f"./results/HRL/HIL_{args.env}_{seed}", evaluation_HIL)
-    Agent_BatchHIL_torch.save(f"./models/HRL/HIL/HIL_{args.env}_{seed}")
+    np.save(f"./results/HRL/HIL_traj_{args.coins}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{seed}", evaluation_HIL)
+    
+    if not os.path.exists(f"./models/HRL/HIL/HIL_traj_{args.coins}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{seed}"):
+        os.makedirs(f"./models/HRL/HIL/HIL_traj_{args.coins}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{seed}")
+    
+    Agent_BatchHIL_torch.save(f"./models/HRL/HIL/HIL_traj_{args.coins}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{seed}/HIL")
     
     
 def HRL(env, args, seed):
@@ -175,14 +201,16 @@ def HRL(env, args, seed):
 def train(env, args, seed): 
     
     # Set seeds
-    env.seed(seed)
+    env.Seed(seed)
     torch.manual_seed(seed)
     np.random.seed(seed)
     
-    # if args.HIL:
-    #     HIL(env, args, seed)
+    if args.HIL:
+        HIL(env, args, seed)
         
-    evaluations, policy = HRL(env, args, seed)
+    # evaluations, policy = HRL(env, args, seed)
+    
+    evaluations, policy = 0, 0
         
     return evaluations, policy
 
@@ -200,7 +228,7 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser()
     #General
-    parser.add_argument("--number_options", default=2, type=int)     # number of options
+    parser.add_argument("--number_options", default=3, type=int)     # number of options
     parser.add_argument("--policy", default="HPPO")                   # Policy name (TD3, DDPG or OurDDPG)
     parser.add_argument("--seed", default=10, type=int)               # Sets Gym, PyTorch and Numpy seeds
     parser.add_argument("--env", default="Foraging")               # Sets Gym, PyTorch and Numpy seeds
@@ -239,9 +267,9 @@ if __name__ == "__main__":
         print("---------------------------------------")
         
     else:
-        file_name = f"{args.policy}_HIL_{args.HIL}_delayed_6_{args.env}_{args.seed}"
+        file_name = f"{args.policy}_HIL_{args.HIL}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.seed}"
         print("---------------------------------------")
-        print(f"Policy: {args.policy}, HIL: {args.HIL}, HGAIL: {args.HGAIL}, Mixed: {args.Mixed_HGAIL}, Env: {args.env}, Seed: {args.seed}")
+        print(f"Policy: {args.policy}, HIL: {args.HIL}, nOptions: {args.number_options}, Supervised: {args.pi_hi_supervised}, Env: {args.env}, Seed: {args.seed}")
         print("---------------------------------------")
         
        
@@ -251,8 +279,10 @@ if __name__ == "__main__":
     if not os.path.exists(f"./models/HRL/{file_name}"):
         os.makedirs(f"./models/HRL/{file_name}")
         
-    if not os.path.exists("./models/HRL/HIL"):
+    if not os.path.exists("./models/HRL/HIL/"):
         os.makedirs("./models/HRL/HIL")
+        
+    coins_array = [2, 10, 13, 16, 17, 29, 30, 35, 40, 41, 42, 43, 44, 46, 49]
         
     coins_location = Coins_location[args.coins,:,:] 
     
@@ -279,9 +309,28 @@ if __name__ == "__main__":
             policy = results[index][1]
             policy.save(f"./models/HRL/{file_name}")
     else:
-        evaluations, policy = train(env, args, args.seed)
-        if args.save_model: 
-            np.save(f"./results/HRL/evaluation_{file_name}", evaluations)
-            policy.save_actor(f"./models/HRL/{file_name}/{file_name}")
+        
+        supervision_array = [False, True]
+        #coins_array = [2, 10, 13, 16, 17, 29, 30, 35, 40, 41, 42, 43, 44, 46, 49]
+        coins_array = [49]
+        
+        for args.coins in coins_array:
+            coins_location = Coins_location[args.coins,:,:] 
+            env = World.Foraging.env(coins_location)
+            for args.pi_hi_supervised in supervision_array:
+                if args.pi_hi_supervised == False:
+                    options_array = [1,2,3]
+                else:
+                    options_array = [2,3]
+                    
+                for args.number_options in options_array:
+            
+                    # evaluations, policy = train(env, args, args.seed)
+                    _, _ = train(env, args, args.seed)
+                    # if args.save_model: 
+                    #     np.save(f"./results/HRL/evaluation_{file_name}", evaluations)
+                    #     policy.save_actor(f"./models/HRL/{file_name}/{file_name}")
+                    
+                    dummy = 0
     
 

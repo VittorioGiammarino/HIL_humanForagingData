@@ -442,6 +442,10 @@ class BatchBW(object):
         option_space = len(NN_actions)
         for i in range(option_space):
             pi_b = NN_termination[i](TrainingSet).cpu()
+            
+            if not (len(pi_b) == len(gamma_tilde_reshaped[:,:,i])):
+                pi_b = pi_b[0:len(gamma_tilde_reshaped[:,:,i]),:]
+            
             loss = loss -torch.sum(torch.FloatTensor(gamma_tilde_reshaped[:,:,i])*torch.log(pi_b[:].clamp(1e-10,1.0)))/(T)
             pi_lo = NN_actions[i](TrainingSet).cpu()
             loss = loss -torch.sum(torch.FloatTensor(gamma_actions[:,:,i])*torch.log(pi_lo.clamp(1e-10,1.0)))/(T)
@@ -459,7 +463,7 @@ class BatchBW(object):
 # =============================================================================
         loss = 0
         n_batches = np.int(self.TrainingSet.shape[0]/self.batch_size)
-        
+                            
         for epoch in range(self.epochs):
             # print("\nStart of epoch %d" % (epoch,))
                 
