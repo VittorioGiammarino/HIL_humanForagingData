@@ -24,7 +24,7 @@ _, _, _, _, _, Reward_training_human, Real_Traj_training_human, Real_Reward_trai
 # %% Plot human expert
 
 threshold = np.mean(Real_Reward_eval_human)
-performance_training = np.mean(Real_Reward_training_human)
+# performance_training = np.mean(Real_Reward_training_human)
 Rand_traj_array = [2, 10, 13, 16, 17, 29, 30, 35, 40, 41, 42, 43, 44, 46, 49]
 # Rand_traj = np.argmax(Real_Reward_eval_human)
 

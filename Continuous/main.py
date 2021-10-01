@@ -21,7 +21,7 @@ import multiprocessing
 import multiprocessing.pool
 
 from evaluation import HierarchicalStochasticSampleTrajMDP
-from utils_main import Show_DataSet
+from utils import Show_DataSet
 import World
 import BatchBW_HIL_pytorch
 import Behavioral_cloning
@@ -51,6 +51,14 @@ size_data = len(Trajectories[Rand_traj])
 coins_location = Coins_location[Rand_traj,:,:] 
 
 # %%
+
+len_trajs = []
+
+for i in range(len(Trajectories)):
+    len_trajs.append(len(Trajectories[i]))
+    
+mean_len_trajs = int(np.mean(len_trajs))
+
 threshold = np.mean(Real_Reward_eval_human)
 Rand_traj = 2
 
@@ -89,10 +97,8 @@ def test(labels, env, max_epoch_per_traj, number_of_trajectories, reset = 'rando
 
     return traj, control, Reward_array    
 
-
 traj, control, Reward_array = test(action_samples, env, max_epoch_per_traj, 1, reset = 'standard', initial_state = Trajectories[Rand_traj][0,:])
     
-
 sigma1 = 0.5
 circle1 = ptch.Circle((6, 7.5), 2*sigma1, color='k',  fill=False)
 sigma2 = 1.1
@@ -206,7 +212,7 @@ args = parser.parse_args()
 env = World.Foraging.env(coins_location)
 
 # Set seeds
-env.seed(args.seed)
+env.Seed(args.seed)
 torch.manual_seed(args.seed)
 np.random.seed(args.seed)
 
@@ -217,11 +223,11 @@ option_dim = args.number_options
 termination_dim = 2
 state_samples = Trajectories[Rand_traj][:,:]
 action_samples = Rotation[Rand_traj][:,0].reshape(len(Rotation[Rand_traj][:,0]),1)
-batch_size = 3200
-M_step_epochs = 100
-l_rate_pi_lo = 0.001
+batch_size = 320
+M_step_epochs = 10
+l_rate_pi_lo = 0.0001
 Agent_continuous_BatchHIL = BatchBW_HIL_pytorch.BatchBW(max_action, state_dim, action_dim, option_dim, termination_dim, state_samples, action_samples, M_step_epochs, batch_size, l_rate_pi_lo, l_rate_pi_lo, l_rate_pi_lo)
-N=10
+N=20
 eval_episodes = 10
 max_epoch = len(state_samples)
 
@@ -233,14 +239,13 @@ Labels_b = Agent_continuous_BatchHIL.prepare_labels_pretrain_pi_b(Options)
 Agent_continuous_BatchHIL.pretrain_pi_b(epochs, Labels_b[0], 0)
 Agent_continuous_BatchHIL.pretrain_pi_b(epochs, Labels_b[1], 1)
 
-# %%
 Loss = 100000
 avg_reward_torch = []
 for i in range(N):
     print(f"Iteration {i+1}/{N}")
     loss = Agent_continuous_BatchHIL.Baum_Welch()
     if loss > Loss:
-        Agent_continuous_BatchHIL.reset_learning_rates(l_rate_pi_lo/2, l_rate_pi_lo/2, l_rate_pi_lo/2)
+        Agent_continuous_BatchHIL.reset_learning_rates(l_rate_pi_lo*0.1, l_rate_pi_lo*0.1, l_rate_pi_lo*0.1)
     Loss = loss
     [trajBatch_torch, controlBatch_torch, OptionsBatch_torch, 
      TerminationBatch_torch, RewardBatch_torch] = HierarchicalStochasticSampleTrajMDP(Agent_continuous_BatchHIL, env, max_epoch, eval_episodes, 'standard', state_samples[0,:])

@@ -166,7 +166,7 @@ class Foraging:
                 
             return self.state
                 
-        def seed(self, seed):
+        def Seed(self, seed):
             self.seed = seed
             np.random.seed(self.seed)
     
@@ -176,7 +176,7 @@ class Foraging:
             state_partial = self.state[0:2]
             # given action, draw next state
             angle = action[0]
-            step = 0.1
+            step = 0.017
             state_plus1_partial = np.zeros((2,))
             state_plus1_partial[0] = state_partial[0] + step*np.cos(angle)
             state_plus1_partial[1] = state_partial[1] + step*np.sin(angle)

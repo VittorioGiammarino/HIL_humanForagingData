@@ -10,11 +10,11 @@ class TanhGaussianHierarchicalActor:
             super(TanhGaussianHierarchicalActor.NN_PI_LO, self).__init__()
             
             self.net = torch.nn.Sequential(
-                torch.nn.Linear(state_dim, 128),
+                torch.nn.Linear(state_dim, 256),
                 torch.nn.ReLU(),
-                torch.nn.Linear(128, 128),
+                torch.nn.Linear(256, 256),
                 torch.nn.ReLU(),
-                torch.nn.Linear(128, action_dim),
+                torch.nn.Linear(256, action_dim),
             )
             
             self.action_dim = action_dim

@@ -8,6 +8,9 @@ Created on Wed Aug 18 16:36:58 2021
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import os
+import matplotlib.patches as ptch
+
 # %% Load Data
 
 TrainingSet_tot = np.load("./Expert_data/TrainingSet.npy")
@@ -33,6 +36,94 @@ for i in range(len(Trajectories)):
     len_trajs.append(len(Trajectories[i]))
     
 mean_len_trajs = int(np.mean(len_trajs))
+
+
+Rand_traj_array = [2, 10, 13, 16, 17, 29, 30, 35, 40, 41, 42, 43, 44, 46, 49]
+# Rand_traj = np.argmax(Real_Reward_eval_human)
+
+n_options = 3
+
+for Rand_traj in Rand_traj_array:
+    
+    supervised_options = np.copy(Trajectories[Rand_traj][:,2])
+    
+    if n_options == 3:
+        for s in range(len(supervised_options)):
+            if Trajectories[Rand_traj][s,1] > 6.5 or Trajectories[Rand_traj][s,1] < -6.5 or Trajectories[Rand_traj][s,0] > 6.5 or Trajectories[Rand_traj][s,0] < -6.5:
+                if supervised_options[s] == 0:
+                    supervised_options[s] = 2
+
+    size_data = len(Trajectories[Rand_traj])
+    
+    coins_location = Coins_location[Rand_traj]
+    
+    sigma1 = 0.5
+    circle1 = ptch.Circle((6, 7.5), 2*sigma1, color='k',  fill=False)
+    sigma2 = 1.1
+    circle2 = ptch.Circle((-1.5, -5), 2*sigma2, color='k',  fill=False)
+    sigma3 = 1.8
+    circle3 = ptch.Circle((-5, 3), 2*sigma3, color='k',  fill=False)
+    sigma4 = 1.3
+    circle4 = ptch.Circle((4.9, -4), 2*sigma4, color='k',  fill=False)
+    fig, ax = plt.subplots()
+    ax.add_artist(circle1)
+    ax.add_artist(circle2)
+    ax.add_artist(circle3)
+    ax.add_artist(circle4)
+    plot_data = plt.scatter(Trajectories[Rand_traj][0:size_data,0], Trajectories[Rand_traj][0:size_data,1], c=Time[Rand_traj][0:size_data], marker='o', cmap='cool') #-1], marker='o', cmap='cool')
+    plt.plot(0.1*coins_location[:,0], 0.1*coins_location[:,1], 'xb')
+    cbar = fig.colorbar(plot_data, ticks=[10, 100, 200, 300, 400, 500])
+    cbar.ax.set_yticklabels(['time = 0', 'time = 100', 'time = 200', 'time = 300', 'time = 400', 'time = 500'])
+    plt.xlabel('x')
+    plt.ylabel('y')
+    plt.title('Human Agent {}, Reward {}'.format(Rand_traj, Reward_eval_human[Rand_traj]))
+    plt.show()  
+    
+    time = np.linspace(0,480,len(Real_Traj_eval_human[Rand_traj][:,0])) 
+    
+    sigma1 = 0.5
+    circle1 = ptch.Circle((6, 7.5), 2*sigma1, color='k',  fill=False)
+    sigma2 = 1.1
+    circle2 = ptch.Circle((-1.5, -5), 2*sigma2, color='k',  fill=False)
+    sigma3 = 1.8
+    circle3 = ptch.Circle((-5, 3), 2*sigma3, color='k',  fill=False)
+    sigma4 = 1.3
+    circle4 = ptch.Circle((4.9, -4), 2*sigma4, color='k',  fill=False)
+    fig, ax = plt.subplots()
+    ax.add_artist(circle1)
+    ax.add_artist(circle2)
+    ax.add_artist(circle3)
+    ax.add_artist(circle4)
+    plot_data = plt.scatter(0.1*Real_Traj_eval_human[Rand_traj][:,0], 0.1*Real_Traj_eval_human[Rand_traj][:,1], c=time, marker='o', cmap='cool') #-1], marker='o', cmap='cool')
+    plt.plot(0.1*coins_location[:,0], 0.1*coins_location[:,1], 'xb')
+    cbar = fig.colorbar(plot_data, ticks=[10, 100, 200, 300, 400, 500])
+    cbar.ax.set_yticklabels(['time = 0', 'time = 100', 'time = 200', 'time = 300', 'time = 400', 'time = 500'])
+    plt.xlabel('x')
+    plt.ylabel('y')
+    plt.title('Human Agent, Reward {}'.format(Real_Reward_eval_human[Rand_traj]))
+    plt.show() 
+    
+    sigma1 = 0.5
+    circle1 = plt.Circle((6, 7.5), 2*sigma1, color='k',  fill=False)
+    sigma2 = 1.1
+    circle2 = plt.Circle((-1.5, -5), 2*sigma2, color='k',  fill=False)
+    sigma3 = 1.8
+    circle3 = plt.Circle((-5, 3), 2*sigma3, color='k',  fill=False)
+    sigma4 = 1.3
+    circle4 = plt.Circle((4.9, -4), 2*sigma4, color='k',  fill=False)
+    fig3, ax3 = plt.subplots()
+    plot_data = plt.scatter(Trajectories[Rand_traj][:,0], Trajectories[Rand_traj][:,1], c=supervised_options, marker='o', cmap='brg')
+    plt.plot(0.1*coins_location[:,0], 0.1*coins_location[:,1], 'xk')
+    cbar = fig3.colorbar(plot_data, ticks=[0, 1, 2])
+    cbar.ax.set_yticklabels(['move center', 'collect', 'move wall'])
+    ax3.add_artist(circle1)
+    ax3.add_artist(circle2)
+    ax3.add_artist(circle3)
+    ax3.add_artist(circle4)
+    plt.xlabel('x')
+    plt.ylabel('y')
+    plt.title('Human Agent {}, Reward {}'.format(Rand_traj, Reward_eval_human[Rand_traj]))
+    plt.show()   
 
 # %%
 
@@ -260,59 +351,284 @@ plt.savefig('Figures/PPO_vs_HPPO.pdf', format='pdf')
 
 # %% Plot HIL
 
-HIL_2_options_supervised = []
+if not os.path.exists("./Figures/HIL_ablation_study"):
+    os.makedirs("./Figures/HIL_ablation_study")
 
-for i in range(8):        
-    with open(f'results/HRL/HIL_Foraging_{i}.npy', 'rb') as f:
-        HIL_2_options_supervised.append(np.load(f, allow_pickle=True))
+
+coins_array = [2, 10, 13, 16, 17, 29, 30, 35, 40, 41, 42, 43, 44, 46, 49]
+
+Results_dictionary = {}
+
+HIL_nOptions_1_supervised_False = []
+HIL_nOptions_2_supervised_False = []
+HIL_nOptions_3_supervised_False = []
+HIL_nOptions_2_supervised_True = []
+HIL_nOptions_3_supervised_True = []
+
+best_reward_nOptions_1_supervised_False = 0
+best_reward_nOptions_2_supervised_False = 0
+best_reward_nOptions_3_supervised_False = 0
+best_reward_nOptions_2_supervised_True = 0
+best_reward_nOptions_3_supervised_True = 0
+
+HIL_nOptions_1_supervised_False_dict = {}
+HIL_nOptions_2_supervised_False_dict = {}
+HIL_nOptions_3_supervised_False_dict = {}
+HIL_nOptions_2_supervised_True_dict = {}
+HIL_nOptions_3_supervised_True_dict = {}
+
+Best_nOptions_1_supervised_False_dict = {}
+Best_nOptions_2_supervised_False_dict = {}
+Best_nOptions_3_supervised_False_dict = {}
+Best_nOptions_2_supervised_True_dict = {}
+Best_nOptions_3_supervised_True_dict = {}
+
+for trj in coins_array:
+    HIL_traj_2_nOptions_1_supervised_False = []
+    HIL_traj_2_nOptions_2_supervised_False = []
+    HIL_traj_2_nOptions_3_supervised_False = []
+    HIL_traj_2_nOptions_2_supervised_True = []
+    HIL_traj_2_nOptions_3_supervised_True = []
+    
+    Expert_Traj_dict = {}
+    
+    supervised = ["True", "False"]
+    
+    for supervision in supervised:
+        if supervision == "True":
+            minNOptions = 2
+        else:
+            minNOptions = 1
+            
+        for nOptions in range(minNOptions, 4):
+    
+            for i in range(8):        
+                with open(f'results/HRL/HIL_traj_{trj}_nOptions_{nOptions}_supervised_{supervision}_{i}.npy', 'rb') as f:
+                    
+                    if nOptions == 1:
+                        HIL_traj_2_nOptions_1_supervised_False.append(np.load(f, allow_pickle=True))
+                        HIL_nOptions_1_supervised_False.append(HIL_traj_2_nOptions_1_supervised_False[i])
+                        
+                        reward = HIL_traj_2_nOptions_1_supervised_False[i][-1]
+                        
+                        if reward > best_reward_nOptions_1_supervised_False:
+                            Best_nOptions_1_supervised_False_dict['reward'] = reward
+                            Best_nOptions_1_supervised_False_dict['seed'] = i
+                            Best_nOptions_1_supervised_False_dict['expert traj'] = trj
+                            best_reward_nOptions_1_supervised_False = reward
+                        
+                        HIL_nOptions_1_supervised_False_dict[f'HIL_traj_{trj}_nOptions_{nOptions}_supervised_{supervision}_{i}'] = HIL_traj_2_nOptions_1_supervised_False[i]                    
+                        Expert_Traj_dict[f'HIL_traj_{trj}_nOptions_{nOptions}_supervised_{supervision}_{i}'] = HIL_traj_2_nOptions_1_supervised_False[i]
+                        
+                    elif nOptions == 2 and supervision == "False":
+                        HIL_traj_2_nOptions_2_supervised_False.append(np.load(f, allow_pickle=True))
+                        HIL_nOptions_2_supervised_False.append(HIL_traj_2_nOptions_2_supervised_False[i])
+                        
+                        reward = HIL_traj_2_nOptions_2_supervised_False[i][-1]
+                        
+                        if reward > best_reward_nOptions_2_supervised_False:
+                            Best_nOptions_2_supervised_False_dict['reward'] = reward
+                            Best_nOptions_2_supervised_False_dict['seed'] = i
+                            Best_nOptions_2_supervised_False_dict['expert traj'] = trj
+                            best_reward_nOptions_2_supervised_False = reward
+                        
+                        HIL_nOptions_2_supervised_False_dict[f'HIL_traj_{trj}_nOptions_{nOptions}_supervised_{supervision}_{i}'] = HIL_traj_2_nOptions_2_supervised_False[i]
+                        Expert_Traj_dict[f'HIL_traj_{trj}_nOptions_{nOptions}_supervised_{supervision}_{i}'] = HIL_traj_2_nOptions_2_supervised_False[i]
         
-Real_Reward_eval_human = np.load("./Expert_data/Real_Reward_eval_human.npy", allow_pickle=True).tolist()    
-threshold = np.mean(Real_Reward_eval_human)
+                    elif nOptions == 3 and supervision == "False":
+                        HIL_traj_2_nOptions_3_supervised_False.append(np.load(f, allow_pickle=True))
+                        HIL_nOptions_3_supervised_False.append(HIL_traj_2_nOptions_3_supervised_False[i])
+                        
+                        reward = HIL_traj_2_nOptions_3_supervised_False[i][-1]
+                        
+                        if reward > best_reward_nOptions_3_supervised_False:
+                            Best_nOptions_3_supervised_False_dict['reward'] = reward
+                            Best_nOptions_3_supervised_False_dict['seed'] = i
+                            Best_nOptions_3_supervised_False_dict['expert traj'] = trj
+                            best_reward_nOptions_3_supervised_False = reward
+                        
+                        HIL_nOptions_3_supervised_False_dict[f'HIL_traj_{trj}_nOptions_{nOptions}_supervised_{supervision}_{i}'] = HIL_traj_2_nOptions_3_supervised_False[i]                      
+                        Expert_Traj_dict[f'HIL_traj_{trj}_nOptions_{nOptions}_supervised_{supervision}_{i}'] = HIL_traj_2_nOptions_3_supervised_False[i]
+                        
+                    elif nOptions == 2 and supervision == "True":
+                        HIL_traj_2_nOptions_2_supervised_True.append(np.load(f, allow_pickle=True))
+                        HIL_nOptions_2_supervised_True.append(HIL_traj_2_nOptions_2_supervised_True[i])
+                        
+                        reward = HIL_traj_2_nOptions_2_supervised_True[i][-1]
+                        
+                        if reward > best_reward_nOptions_2_supervised_True:
+                            Best_nOptions_2_supervised_True_dict['reward'] = reward
+                            Best_nOptions_2_supervised_True_dict['seed'] = i
+                            Best_nOptions_2_supervised_True_dict['expert traj'] = trj
+                            best_reward_nOptions_2_supervised_True = reward
+                        
+                        HIL_nOptions_2_supervised_True_dict[f'HIL_traj_{trj}_nOptions_{nOptions}_supervised_{supervision}_{i}'] = HIL_traj_2_nOptions_2_supervised_True[i]                       
+                        Expert_Traj_dict[f'HIL_traj_{trj}_nOptions_{nOptions}_supervised_{supervision}_{i}'] = HIL_traj_2_nOptions_2_supervised_True[i]
+        
+                    elif nOptions == 3 and supervision == "True":
+                        HIL_traj_2_nOptions_3_supervised_True.append(np.load(f, allow_pickle=True))
+                        HIL_nOptions_3_supervised_True.append(HIL_traj_2_nOptions_3_supervised_True[i])
+                        
+                        reward = HIL_traj_2_nOptions_3_supervised_True[i][-1]
+                        
+                        if reward > best_reward_nOptions_3_supervised_True:
+                            Best_nOptions_3_supervised_True_dict['reward'] = reward
+                            Best_nOptions_3_supervised_True_dict['seed'] = i
+                            Best_nOptions_3_supervised_True_dict['expert traj'] = trj
+                            best_reward_nOptions_3_supervised_True = reward
+                        
+                        HIL_nOptions_3_supervised_True_dict[f'HIL_traj_{trj}_nOptions_{nOptions}_supervised_{supervision}_{i}'] = HIL_traj_2_nOptions_3_supervised_True[i]                   
+                        Expert_Traj_dict[f'HIL_traj_{trj}_nOptions_{nOptions}_supervised_{supervision}_{i}'] = HIL_traj_2_nOptions_3_supervised_True[i]
+                        
+                        
+    Results_dictionary[f'HIL_Expert_traj_{trj}'] = Expert_Traj_dict
+                                
+    Real_Reward_eval_human = np.load("./Expert_data/Real_Reward_eval_human.npy", allow_pickle=True).tolist()    
+    threshold = np.mean(Real_Reward_eval_human)
+    
+    HIL_traj_2_nOptions_1_supervised_False_mean = np.mean(np.array(HIL_traj_2_nOptions_1_supervised_False),0)
+    HIL_traj_2_nOptions_1_supervised_False_std= np.std(np.array(HIL_traj_2_nOptions_1_supervised_False),0)
+    
+    HIL_traj_2_nOptions_2_supervised_False_mean = np.mean(np.array(HIL_traj_2_nOptions_2_supervised_False),0)
+    HIL_traj_2_nOptions_2_supervised_False_std= np.std(np.array(HIL_traj_2_nOptions_2_supervised_False),0)
+    
+    HIL_traj_2_nOptions_3_supervised_False_mean = np.mean(np.array(HIL_traj_2_nOptions_3_supervised_False),0)
+    HIL_traj_2_nOptions_3_supervised_False_std= np.std(np.array(HIL_traj_2_nOptions_3_supervised_False),0)
+    
+    HIL_traj_2_nOptions_2_supervised_True_mean = np.mean(np.array(HIL_traj_2_nOptions_2_supervised_True),0)
+    HIL_traj_2_nOptions_2_supervised_True_std= np.std(np.array(HIL_traj_2_nOptions_2_supervised_True),0)
+    
+    HIL_traj_2_nOptions_3_supervised_True_mean = np.mean(np.array(HIL_traj_2_nOptions_3_supervised_True),0)
+    HIL_traj_2_nOptions_3_supervised_True_std= np.std(np.array(HIL_traj_2_nOptions_3_supervised_True),0)
+    
+    BW_iters = np.linspace(0,10,len(HIL_traj_2_nOptions_1_supervised_False[0]))
+    Human_average_performance = threshold*np.ones((len(BW_iters),))
+    
+    # fig, ax = plt.subplots()
+    # clrs = sns.color_palette("husl", 9)
+    # ax.plot(BW_iters, HIL_traj_2_nOptions_1_supervised_False[0], label='seed 0', c=clrs[0])
+    # ax.plot(BW_iters, HIL_traj_2_nOptions_1_supervised_False[1], label='seed 1', c=clrs[1])
+    # ax.plot(BW_iters, HIL_traj_2_nOptions_1_supervised_False[2], label='seed 2', c=clrs[2])
+    # ax.plot(BW_iters, HIL_traj_2_nOptions_1_supervised_False[3], label='seed 3', c=clrs[3])
+    # ax.plot(BW_iters, HIL_traj_2_nOptions_1_supervised_False[4], label='seed 4', c=clrs[4])
+    # ax.plot(BW_iters, HIL_traj_2_nOptions_1_supervised_False[5], label='seed 5', c=clrs[5])
+    # ax.plot(BW_iters, HIL_traj_2_nOptions_1_supervised_False[6], label='seed 6', c=clrs[6])
+    # ax.plot(BW_iters, HIL_traj_2_nOptions_1_supervised_False[7], label='seed 7', c=clrs[7])
+    # ax.plot(BW_iters, Human_average_performance, "--", label='Humans', c=clrs[8])
+    # box = ax.get_position()
+    # ax.set_position([box.x0, box.y0 + box.height * 0.20,
+    #                  box.width, box.height * 0.8])
+    # # Put a legend below current axis
+    # ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.2),
+    #           fancybox=True, shadow=True, ncol=5)
+    # ax.set_ylim([0,300])
+    # ax.set_xlabel('Iterations')
+    # ax.set_ylabel('Reward')
+    # ax.set_title('HIL 2 options')
+    # plt.savefig('Figures/HIL_ablation_study/HIL_traj_2_nOptions_1_supervised_False.pdf', format='pdf')
+    
+    # fig, ax = plt.subplots()
+    # clrs = sns.color_palette("husl", 9)
+    # ax.plot(BW_iters, HIL_traj_2_nOptions_1_supervised_False_mean, label='HIL, traj: 2, nOptions: 1, supervised: False', c=clrs[0])
+    # ax.fill_between(BW_iters, HIL_traj_2_nOptions_1_supervised_False_mean-HIL_traj_2_nOptions_1_supervised_False_std, HIL_traj_2_nOptions_1_supervised_False_mean+HIL_traj_2_nOptions_1_supervised_False_std, alpha=0.2, facecolor=clrs[0])
+    # ax.plot(BW_iters, HIL_traj_2_nOptions_2_supervised_False_mean, label='HIL, traj: 2, nOptions: 2, supervised: False', c=clrs[1])
+    # ax.fill_between(BW_iters, HIL_traj_2_nOptions_2_supervised_False_mean-HIL_traj_2_nOptions_2_supervised_False_std, HIL_traj_2_nOptions_2_supervised_False_mean+HIL_traj_2_nOptions_2_supervised_False_std, alpha=0.2, facecolor=clrs[1])
+    # ax.plot(BW_iters, HIL_traj_2_nOptions_3_supervised_False_mean, label='HIL, traj: 2, nOptions: 3, supervised: False', c=clrs[2])
+    # ax.fill_between(BW_iters, HIL_traj_2_nOptions_3_supervised_False_mean-HIL_traj_2_nOptions_3_supervised_False_std, HIL_traj_2_nOptions_3_supervised_False_mean+HIL_traj_2_nOptions_3_supervised_False_std, alpha=0.2, facecolor=clrs[2])
+    # ax.plot(BW_iters, HIL_traj_2_nOptions_2_supervised_True_mean, label='HIL, traj: 2, nOptions: 2, supervised: True', c=clrs[3])
+    # ax.fill_between(BW_iters, HIL_traj_2_nOptions_2_supervised_True_mean-HIL_traj_2_nOptions_2_supervised_True_std, HIL_traj_2_nOptions_2_supervised_True_mean+HIL_traj_2_nOptions_2_supervised_True_std, alpha=0.2, facecolor=clrs[3])
+    # ax.plot(BW_iters, HIL_traj_2_nOptions_3_supervised_True_mean, label='HIL, traj: 2, nOptions: 3, supervised: True', c=clrs[4])
+    # ax.fill_between(BW_iters, HIL_traj_2_nOptions_3_supervised_True_mean-HIL_traj_2_nOptions_3_supervised_True_std, HIL_traj_2_nOptions_3_supervised_True_mean+HIL_traj_2_nOptions_3_supervised_True_std, alpha=0.2, facecolor=clrs[4])
+    # ax.plot(BW_iters, Human_average_performance, "--", label='Humans', c=clrs[8])
+    # box = ax.get_position()
+    # ax.set_position([box.x0, box.y0 + box.height * 0.1,
+    #                  box.width, box.height * 0.9])
+    # # Put a legend below current axis
+    # ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15),
+    #           fancybox=True, shadow=True, ncol=3)
+    # ax.set_ylim([0,300])
+    # ax.set_xlabel('Steps')
+    # ax.set_ylabel('Reward')
+    # ax.set_title('Comparison')
+    # plt.savefig('Figures/HIL_ablation_study/HIL_comparison_std_on.pdf', format='pdf', bbox_inches='tight')
+    
+    fig, ax = plt.subplots(figsize=(8,5))
+    clrs = sns.color_palette("husl", 9)
+    ax.plot(BW_iters, HIL_traj_2_nOptions_1_supervised_False_mean, label='HIL, traj: 2, nOptions: 1, supervised: False', c=clrs[0])
+    # ax.fill_between(BW_iters, HIL_traj_2_nOptions_1_supervised_False_mean-HIL_traj_2_nOptions_1_supervised_False_std, HIL_traj_2_nOptions_1_supervised_False_mean+HIL_traj_2_nOptions_1_supervised_False_std, alpha=0.2, facecolor=clrs[0])
+    ax.plot(BW_iters, HIL_traj_2_nOptions_2_supervised_False_mean, label='HIL, traj: 2, nOptions: 2, supervised: False', c=clrs[1])
+    # ax.fill_between(BW_iters, HIL_traj_2_nOptions_2_supervised_False_mean-HIL_traj_2_nOptions_2_supervised_False_std, HIL_traj_2_nOptions_2_supervised_False_mean+HIL_traj_2_nOptions_2_supervised_False_std, alpha=0.2, facecolor=clrs[1])
+    ax.plot(BW_iters, HIL_traj_2_nOptions_3_supervised_False_mean, label='HIL, traj: 2, nOptions: 3, supervised: False', c=clrs[2])
+    # ax.fill_between(BW_iters, HIL_traj_2_nOptions_3_supervised_False_mean-HIL_traj_2_nOptions_3_supervised_False_std, HIL_traj_2_nOptions_3_supervised_False_mean+HIL_traj_2_nOptions_3_supervised_False_std, alpha=0.2, facecolor=clrs[2])
+    ax.plot(BW_iters, HIL_traj_2_nOptions_2_supervised_True_mean, label='HIL, traj: 2, nOptions: 2, supervised: True', c=clrs[3])
+    # ax.fill_between(BW_iters, HIL_traj_2_nOptions_2_supervised_True_mean-HIL_traj_2_nOptions_2_supervised_True_std, HIL_traj_2_nOptions_2_supervised_True_mean+HIL_traj_2_nOptions_2_supervised_True_std, alpha=0.2, facecolor=clrs[3])
+    ax.plot(BW_iters, HIL_traj_2_nOptions_3_supervised_True_mean, label='HIL, traj: 2, nOptions: 3, supervised: True', c=clrs[4])
+    # ax.fill_between(BW_iters, HIL_traj_2_nOptions_3_supervised_True_mean-HIL_traj_2_nOptions_3_supervised_True_std, HIL_traj_2_nOptions_3_supervised_True_mean+HIL_traj_2_nOptions_3_supervised_True_std, alpha=0.2, facecolor=clrs[4])
+    ax.plot(BW_iters, Human_average_performance, "--", label='Humans', c=clrs[8])
+    box = ax.get_position()
+    ax.set_position([box.x0, box.y0 + box.height * 0.1,
+                     box.width, box.height * 0.9])
+    # Put a legend below current axis
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15),
+              fancybox=True, shadow=True, ncol=1)
+    ax.set_ylim([0,300])
+    ax.set_xlabel('Steps')
+    ax.set_ylabel('Reward')
+    ax.set_title('Comparison')
+    plt.savefig(f'Figures/HIL_ablation_study/HIL_traj_{trj}_comparison_std_off.pdf', format='pdf', bbox_inches='tight')
+    
+ 
+Results_dictionary['HIL_nOptions_1_supervised_False'] = HIL_nOptions_1_supervised_False_dict
+Results_dictionary['HIL_nOptions_2_supervised_False'] = HIL_nOptions_2_supervised_False_dict
+Results_dictionary['HIL_nOptions_3_supervised_False'] = HIL_nOptions_3_supervised_False_dict
+Results_dictionary['HIL_nOptions_2_supervised_True'] = HIL_nOptions_2_supervised_True_dict
+Results_dictionary['HIL_nOptions_3_supervised_True'] = HIL_nOptions_3_supervised_True_dict
 
-HIL_2_options_supervised_mean = np.mean(np.array(HIL_2_options_supervised),0)
-HIL_2_options_supervised_std= np.std(np.array(HIL_2_options_supervised),0)
+Results_dictionary['Best_nOptions_1_supervised_False'] = Best_nOptions_1_supervised_False_dict
+Results_dictionary['Best_nOptions_2_supervised_False'] = Best_nOptions_2_supervised_False_dict
+Results_dictionary['Best_nOptions_3_supervised_False'] = Best_nOptions_3_supervised_False_dict
+Results_dictionary['Best_nOptions_2_supervised_True'] = Best_nOptions_2_supervised_True_dict
+Results_dictionary['Best_nOptions_3_supervised_True'] = Best_nOptions_3_supervised_True_dict
 
-BW_iters = np.linspace(0,10,len(HIL_2_options_supervised[0]))
-Human_average_performance = threshold*np.ones((len(BW_iters),))
+    
+HIL_nOptions_1_supervised_False_mean = np.mean(np.array(HIL_nOptions_1_supervised_False),0)
+HIL_nOptions_1_supervised_False_std= np.std(np.array(HIL_nOptions_1_supervised_False),0)
 
-fig, ax = plt.subplots()
+HIL_nOptions_2_supervised_False_mean = np.mean(np.array(HIL_nOptions_2_supervised_False),0)
+HIL_nOptions_2_supervised_False_std= np.std(np.array(HIL_nOptions_2_supervised_False),0)
+
+HIL_nOptions_3_supervised_False_mean = np.mean(np.array(HIL_nOptions_3_supervised_False),0)
+HIL_nOptions_3_supervised_False_std= np.std(np.array(HIL_nOptions_3_supervised_False),0)
+
+HIL_nOptions_2_supervised_True_mean = np.mean(np.array(HIL_nOptions_2_supervised_True),0)
+HIL_nOptions_2_supervised_True_std= np.std(np.array(HIL_nOptions_2_supervised_True),0)
+
+HIL_nOptions_3_supervised_True_mean = np.mean(np.array(HIL_nOptions_3_supervised_True),0)
+HIL_nOptions_3_supervised_True_std= np.std(np.array(HIL_nOptions_3_supervised_True),0)
+    
+fig, ax = plt.subplots(figsize=(8,5))
 clrs = sns.color_palette("husl", 9)
-ax.plot(BW_iters, HIL_2_options_supervised[0], label='seed 0', c=clrs[0])
-ax.plot(BW_iters, HIL_2_options_supervised[1], label='seed 1', c=clrs[1])
-ax.plot(BW_iters, HIL_2_options_supervised[2], label='seed 2', c=clrs[2])
-ax.plot(BW_iters, HIL_2_options_supervised[3], label='seed 3', c=clrs[3])
-ax.plot(BW_iters, HIL_2_options_supervised[4], label='seed 4', c=clrs[4])
-ax.plot(BW_iters, HIL_2_options_supervised[5], label='seed 5', c=clrs[5])
-ax.plot(BW_iters, HIL_2_options_supervised[6], label='seed 6', c=clrs[6])
-ax.plot(BW_iters, HIL_2_options_supervised[7], label='seed 7', c=clrs[7])
-ax.plot(BW_iters, Human_average_performance, "--", label='Humans', c=clrs[8])
-box = ax.get_position()
-ax.set_position([box.x0, box.y0 + box.height * 0.20,
-                 box.width, box.height * 0.8])
-# Put a legend below current axis
-ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.2),
-          fancybox=True, shadow=True, ncol=5)
-ax.set_ylim([0,300])
-ax.set_xlabel('Iterations')
-ax.set_ylabel('Reward')
-ax.set_title('HIL 2 options')
-plt.savefig('Figures/HIL_2_options_supervised.pdf', format='pdf')
-
-fig, ax = plt.subplots()
-clrs = sns.color_palette("husl", 9)
-ax.plot(BW_iters, HIL_2_options_supervised_mean, label='HIL 2 options supervised', c=clrs[0])
-ax.fill_between(BW_iters, HIL_2_options_supervised_mean-HIL_2_options_supervised_std, HIL_2_options_supervised_mean+HIL_2_options_supervised_std, alpha=0.2, facecolor=clrs[0])
+ax.plot(BW_iters, HIL_nOptions_1_supervised_False_mean, label='HIL, nOptions: 1, supervised: False', c=clrs[0])
+# ax.fill_between(BW_iters, HIL_traj_2_nOptions_1_supervised_False_mean-HIL_traj_2_nOptions_1_supervised_False_std, HIL_traj_2_nOptions_1_supervised_False_mean+HIL_traj_2_nOptions_1_supervised_False_std, alpha=0.2, facecolor=clrs[0])
+ax.plot(BW_iters, HIL_nOptions_2_supervised_False_mean, label='HIL, nOptions: 2, supervised: False', c=clrs[1])
+# ax.fill_between(BW_iters, HIL_traj_2_nOptions_2_supervised_False_mean-HIL_traj_2_nOptions_2_supervised_False_std, HIL_traj_2_nOptions_2_supervised_False_mean+HIL_traj_2_nOptions_2_supervised_False_std, alpha=0.2, facecolor=clrs[1])
+ax.plot(BW_iters, HIL_nOptions_3_supervised_False_mean, label='HIL, nOptions: 3, supervised: False', c=clrs[2])
+# ax.fill_between(BW_iters, HIL_traj_2_nOptions_3_supervised_False_mean-HIL_traj_2_nOptions_3_supervised_False_std, HIL_traj_2_nOptions_3_supervised_False_mean+HIL_traj_2_nOptions_3_supervised_False_std, alpha=0.2, facecolor=clrs[2])
+ax.plot(BW_iters, HIL_nOptions_2_supervised_True_mean, label='HIL, nOptions: 2, supervised: True', c=clrs[3])
+# ax.fill_between(BW_iters, HIL_traj_2_nOptions_2_supervised_True_mean-HIL_traj_2_nOptions_2_supervised_True_std, HIL_traj_2_nOptions_2_supervised_True_mean+HIL_traj_2_nOptions_2_supervised_True_std, alpha=0.2, facecolor=clrs[3])
+ax.plot(BW_iters, HIL_nOptions_3_supervised_True_mean, label='HIL, nOptions: 3, supervised: True', c=clrs[4])
+# ax.fill_between(BW_iters, HIL_traj_2_nOptions_3_supervised_True_mean-HIL_traj_2_nOptions_3_supervised_True_std, HIL_traj_2_nOptions_3_supervised_True_mean+HIL_traj_2_nOptions_3_supervised_True_std, alpha=0.2, facecolor=clrs[4])
 ax.plot(BW_iters, Human_average_performance, "--", label='Humans', c=clrs[8])
 box = ax.get_position()
 ax.set_position([box.x0, box.y0 + box.height * 0.1,
                  box.width, box.height * 0.9])
 # Put a legend below current axis
 ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15),
-          fancybox=True, shadow=True, ncol=5)
+          fancybox=True, shadow=True, ncol=1)
 ax.set_ylim([0,300])
 ax.set_xlabel('Steps')
 ax.set_ylabel('Reward')
 ax.set_title('Comparison')
-plt.savefig('Figures/HIL_comparison.pdf', format='pdf')
+plt.savefig('Figures/HIL_ablation_study/HIL_over_trajs_comparison_std_off.pdf', format='pdf', bbox_inches='tight')
 
 
