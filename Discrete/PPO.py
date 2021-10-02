@@ -123,9 +123,9 @@ class PPO:
                 episode_reward+=reward
                 self.Total_t += 1
                         
-            # if done: 
-            #     # +1 to account for 0 indexing. +0 on ep_timesteps since it will increment +1 even if done=True
-            #     print(f"Total T: {self.Total_t}, Iter Num: {self.Total_iter}, Episode T: {t} Reward: {episode_reward:.3f}")
+            if done: 
+                # +1 to account for 0 indexing. +0 on ep_timesteps since it will increment +1 even if done=True
+                print(f"Total T: {self.Total_t}, Iter Num: {self.Total_iter}, Episode T: {t} Reward: {episode_reward:.3f}")
                 
             episode_states = torch.FloatTensor(episode_states)
             episode_actions = torch.LongTensor(episode_actions)
@@ -210,20 +210,22 @@ class PPO:
         
         
     def save_actor(self, filename):
-        torch.save(self.actor.state_dict(), filename + "_actor")
+        option = 0
+        torch.save(self.actor.state_dict(), filename + f"_pi_lo_option_{option}")
+        torch.save(self.optimizer_actor.state_dict(), filename + f"_pi_lo_option_{option}")
     
-    def load_actor(self, filename, HIL = False):
-        if HIL:
-            option = 0
-            self.actor.load_state_dict(torch.load(filename + f"_pi_lo_option_{option}"))
-        else:
-            self.actor.load_state_dict(torch.load(filename + "_actor"))
+    def load_actor(self, filename):
+        option = 0
+        self.actor.load_state_dict(torch.load(filename + f"_pi_lo_option_{option}"))
+        self.optimizer_actor.load_state_dict(torch.load(filename + f"_pi_lo_optimizer_option_{option}"))
 
     def save_critic(self, filename):
         torch.save(self.value_function.state_dict(), filename + "_value_function")
+        torch.save(self.optimizer_value_function.state_dict(), filename + "_value_function_optimizer")
     
     def load_critic(self, filename):
-        self.value_function.load_state_dict(torch.load(filename + "_value_function"))           
+        self.value_function.load_state_dict(torch.load(filename + "_value_function"))      
+        self.optimizer_value_function.load_state_dict(torch.load(filename + "_value_function_optimizer"))   
         
         
 

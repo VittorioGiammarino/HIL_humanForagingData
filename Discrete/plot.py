@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import os
 import matplotlib.patches as ptch
+import pickle
 
 # %% Load Data
 
@@ -631,4 +632,17 @@ ax.set_ylabel('Reward')
 ax.set_title('Comparison')
 plt.savefig('Figures/HIL_ablation_study/HIL_over_trajs_comparison_std_off.pdf', format='pdf', bbox_inches='tight')
 
+# %%
 
+def save_obj(obj, name):
+    with open('results/'+ name + '.pkl', 'wb') as f:
+        pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
+
+def load_obj(name):
+    with open('results/' + name + '.pkl', 'rb') as f:
+        return pickle.load(f)
+
+if not os.path.exists("./results/HIL_ablation_study"):
+    os.makedirs("./results/HIL_ablation_study")
+
+save_obj(Results_dictionary, 'HIL_ablation_study/Sorted_results')

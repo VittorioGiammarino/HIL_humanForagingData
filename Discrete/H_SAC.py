@@ -14,7 +14,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 class H_SAC(object):
     def __init__(self, state_dim, action_dim, option_dim, termination_dim, encoding_info = None, 
                  l_rate_pi_lo=3e-4, l_rate_pi_hi=3e-4 , l_rate_pi_b=3e-4, l_rate_critic=3e-4, discount=0.99, 
-                 tau=0.005, eta = 0.001, pi_b_freq=5, pi_hi_freq=5, alpha=0.2, critic_freq=2):
+                 tau=0.005, eta = 0.001, pi_b_freq=20, pi_hi_freq=20, alpha=0.2, critic_freq=2):
         
         self.state_dim = state_dim
         self.action_dim = action_dim
@@ -273,3 +273,6 @@ class H_SAC(object):
         self.Critic.load_state_dict(torch.load(filename + "_critic"))
         self.critic_optimizer.load_state_dict(torch.load(filename + "_critic_optimizer"))
         self.Critic_target = copy.deepcopy(self.Critic)
+        
+
+        

@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 from Buffer import ReplayBuffer
 from models import SoftmaxHierarchicalActor
-from models import Critic
+from models import Critic_flat
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -20,7 +20,7 @@ class SAC(object):
         self.actor = SoftmaxHierarchicalActor.NN_PI_LO(state_dim, action_dim).to(device)
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=3e-4)
         
-        self.critic = Critic(state_dim, action_dim, 1).to(device)
+        self.critic = Critic_flat(state_dim, action_dim).to(device)
         self.critic_target = copy.deepcopy(self.critic)
         self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=3e-4)
         
@@ -30,6 +30,8 @@ class SAC(object):
 
         self.state_dim = state_dim
         self.action_dim = action_dim
+        self.encoding_info = encoding_info
+        
         self.discount = discount
         self.tau = tau
         self.alpha = alpha
@@ -75,8 +77,7 @@ class SAC(object):
         self.total_it += 1
 
 		# Sample replay buffer 
-        state, action, next_state, reward, not_done = self.Buffer.sample(batch_size)
-        option_vector = torch.zeros_like(reward[:,0] , dtype=int)
+        state, action, next_state, reward, cost, not_done = self.Buffer.sample(batch_size)
 
         with torch.no_grad():
             # Select action according to policy and add clipped noise			
@@ -84,12 +85,12 @@ class SAC(object):
             next_action = F.one_hot(next_action, num_classes=self.action_dim)
 
             # Compute the target Q value
-            target_Q1, target_Q2 = self.critic_target(next_state, next_action, option_vector)
+            target_Q1, target_Q2 = self.critic_target(next_state, next_action)
             target_Q = torch.min(target_Q1, target_Q2) - self.alpha*log_pi_next_state
-            target_Q = reward + not_done * self.discount * target_Q
+            target_Q = reward-cost + not_done * self.discount * target_Q
 
 		# Get current Q estimates
-        current_Q1, current_Q2 = self.critic(state, action, option_vector)
+        current_Q1, current_Q2 = self.critic(state, action)
 
 		# Compute critic loss
         critic_loss = F.mse_loss(current_Q1, target_Q) + F.mse_loss(current_Q2, target_Q)
@@ -99,9 +100,11 @@ class SAC(object):
         critic_loss.backward()
         self.critic_optimizer.step()
 
+        self.actor.train()
         action, log_pi_state = self.actor.sample(state)   
+        action = F.one_hot(action, num_classes=self.action_dim)
         
-        Q1, Q2 = self.critic(state, action, option_vector)
+        Q1, Q2 = self.critic(state, action)
 
         actor_loss = ((self.alpha*log_pi_state)-torch.min(Q1,Q2)).mean()
 			
@@ -126,19 +129,15 @@ class SAC(object):
 
 
     def save_actor(self, filename):
-        torch.save(self.actor.state_dict(), filename + "_actor")
-        torch.save(self.actor_optimizer.state_dict(), filename + "_actor_optimizer")
+        option = 0
+        torch.save(self.actor.state_dict(), filename + f"_pi_lo_option_{option}")
+        torch.save(self.actor_optimizer.state_dict(), filename + f"_pi_lo_optimizer_option_{option}")
         
-    def load_actor(self, filename, HIL = False):
-        if HIL:
-            option = 0
-            self.actor.load_state_dict(torch.load(filename + f"_pi_lo_option_{option}"))
-            self.actor_optimizer.load_state_dict(torch.load(filename + f"_pi_lo_optimizer_option_{option}"))
-            self.actor_target = copy.deepcopy(self.actor)
-        else:      
-            self.actor.load_state_dict(torch.load(filename + "_actor"))
-            self.actor_optimizer.load_state_dict(torch.load(filename + "_actor_optimizer"))
-            self.actor_target = copy.deepcopy(self.actor)
+    def load_actor(self, filename):
+        option = 0
+        self.actor.load_state_dict(torch.load(filename + f"_pi_lo_option_{option}"))
+        self.actor_optimizer.load_state_dict(torch.load(filename + f"_pi_lo_optimizer_option_{option}"))
+        self.actor_target = copy.deepcopy(self.actor)
         
     def save_critic(self, filename):
         torch.save(self.Critic.state_dict(), filename + "_critic")

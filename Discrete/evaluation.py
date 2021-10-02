@@ -73,23 +73,47 @@ def HierarchicalStochasticSampleTrajMDP(Hierarchical_policy, env, max_epoch_per_
     
     return traj, control, Option, Termination, Reward_array    
 
-def eval_policy(policy, env_name, seed, training_iter, eval_episodes=10, reset = 'random', initial_state = np.array([0,0,0,8])):
-	eval_env = env_name
+def FlatStochasticSampleTrajMDP(policy, env, max_epoch_per_traj, number_of_trajectories, reset = 'random', initial_state = np.array([0,0,0,8])):
+    traj = [[None]*1 for _ in range(number_of_trajectories)]
+    control = [[None]*1 for _ in range(number_of_trajectories)]
+    Reward_array = np.empty((0,0),int)
+   
+    policy.actor.eval()
+    
+    for t in range(number_of_trajectories):
+        state, done = env.reset(reset, initial_state), False
+        
+        size_input = len(state)
+        x = np.empty((0, size_input))
+        x = np.append(x, state.reshape(1, size_input), 0)
+        u_tot = np.empty((0,0),int)
+        cum_reward = 0 
+        
+        for _ in range(0,max_epoch_per_traj):
+            action = policy.select_action(np.array(state))
+            u_tot = np.append(u_tot, action) 
+            
+            state, reward, done, _ = env.step(action)
+            x = np.append(x, state.reshape(1, size_input), 0)
+            cum_reward = cum_reward + reward  
+            
+        traj[t] = x
+        control[t]=u_tot
+        Reward_array = np.append(Reward_array, cum_reward)
+        
+    return traj, control, Reward_array  
+            
 
-	avg_reward = 0.
-	for _ in range(eval_episodes):
-		state, done = eval_env.reset(reset, initial_state), False
-		while not done:
-			action = policy.select_action(np.array(state))
-			state, reward, done, _ = eval_env.step(action)
-			avg_reward += reward
+def eval_policy(seed, policy, env, max_epoch_per_traj, number_of_trajectories, reset = 'random', initial_state = np.array([0,0,0,8])):
 
-	avg_reward /= eval_episodes
+    Trajs, Actions, Reward = FlatStochasticSampleTrajMDP(policy, env, max_epoch_per_traj, number_of_trajectories, reset, initial_state)
+    avg_reward = np.sum(Reward)/number_of_trajectories
 
-	print("---------------------------------------")
-	print(f"Seed {seed}, Iter {training_iter}, Evaluation over {eval_episodes} episodes: {avg_reward:.3f}")
-	print("---------------------------------------")
-	return avg_reward
+    print("---------------------------------------")
+    print(f"Seed {seed}, Evaluation over {number_of_trajectories}, episodes: {avg_reward:.3f}")
+    print("---------------------------------------")
+    
+    return avg_reward
 
 def evaluate_H(seed, Hierarchical_policy, env, max_epoch_per_traj, number_of_trajectories, reset = 'random', initial_state = np.array([0,0,0,8])):
     
@@ -98,7 +122,7 @@ def evaluate_H(seed, Hierarchical_policy, env, max_epoch_per_traj, number_of_tra
     avg_reward = np.sum(RewardBatch_torch)/number_of_trajectories
     
     print("---------------------------------------")
-    print(f"Seed {seed}, Evaluation over {number_of_trajectories} episodes: {avg_reward:.3f}")
-    print("---------------------------------------")
+    print(f"Seed {seed}, Evaluation over {number_of_trajectories}, episodes: {avg_reward:.3f}")
+    print("---------------------------------------")   
     
     return avg_reward
