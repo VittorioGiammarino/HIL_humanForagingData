@@ -1,0 +1,25 @@
+#!/bin/bash -l
+
+#$ -t 1-8
+
+#$ -l h_rt=96:00:00
+
+#$ -m e
+
+#$ -j y
+
+#$ -N PPO_8_Seeds
+
+#$ -V
+
+#$ -pe omp 8
+#$ -l mem_per_core=4G
+
+module load python3/3.7.7
+module load pytorch/1.9.0
+
+ID_seed =$(($SGE_TASK_ID-1))
+
+python PPO --seed ID_seed
+
+

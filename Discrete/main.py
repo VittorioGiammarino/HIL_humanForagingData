@@ -378,7 +378,7 @@ if __name__ == "__main__":
     parser.add_argument("--max_iter", default=334, type=int)    # Max time steps to run environment
     parser.add_argument("--coins", default=2, type=int)
     #IL
-    parser.add_argument("--HIL", default=True, type=bool)         # Batch size for HIL
+    parser.add_argument("--HIL", action="store_false")          # Batch size for HIL
     parser.add_argument("--load_HIL_model", default=True, type=bool)         # Batch size for HIL
     parser.add_argument("--load_HIL_model_seed", default=0, type=int)         # Batch size for HIL
     parser.add_argument("--load_HIL_model_expert_traj", default=0, type=int)         # Batch size for HIL
@@ -387,7 +387,7 @@ if __name__ == "__main__":
     parser.add_argument("--maximization_epochs_HIL", default=10, type=int) # Optimization epochs HIL
     parser.add_argument("--l_rate_HIL", default=0.001, type=float)         # Optimization epochs HIL
     parser.add_argument("--N_iterations", default=11, type=int)            # Number of EM iterations
-    parser.add_argument("--pi_hi_supervised", default=True, type=bool)     # Supervised pi_hi
+    parser.add_argument("--pi_hi_supervised", action="store_true")     # Supervised pi_hi
     parser.add_argument("--pi_hi_supervised_epochs", default=200, type=int)  
     # HRL
     parser.add_argument("--start_timesteps", default=25e3, type=int) # Time steps before training default=25e3
@@ -408,9 +408,6 @@ if __name__ == "__main__":
     if not os.path.exists("./results/HRL"):
         os.makedirs("./results/HRL")
                
-    if not os.path.exists(f"./models/HRL/{file_name}"):
-        os.makedirs(f"./models/HRL/{file_name}")
-        
     if not os.path.exists("./models/HRL/HIL/"):
         os.makedirs("./models/HRL/HIL")
         
@@ -423,12 +420,16 @@ if __name__ == "__main__":
         print(f"Policy: {args.policy}, HIL: {args.HIL}, nOptions: {args.number_options}, Supervised: {args.pi_hi_supervised}, Env: {args.env}, Seed: {args.seed}")
         print("---------------------------------------")
         
+    if not os.path.exists(f"./models/HRL/{file_name}"):
+        os.makedirs(f"./models/HRL/{file_name}")
+        
     if args.load_HIL_model:
         args.load_HIL_model_seed = HIL_ablation_study_results[f'Best_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}']['seed']
         args.load_HIL_model_expert_traj = HIL_ablation_study_results[f'Best_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}']['expert traj']
         args.coins = args.load_HIL_model_expert_traj
-        
-    coins_location = Coins_location[args.coins,:,:] 
+     
+    coins_distribution = 2 # we standardize the exact coins position throughout the experiments    
+    coins_location = Coins_location[coins_distribution,:,:] 
     env = World.Foraging.env(coins_location)
 
     evaluations, policy = train(env, args, args.seed)

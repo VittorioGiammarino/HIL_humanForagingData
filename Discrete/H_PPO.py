@@ -460,11 +460,11 @@ class H_PPO:
 
     def save_critic(self, filename):
         torch.save(self.value_function.state_dict(), filename + "_value_function")
-        torch.save(self.value_function_optimizer.state_dict(), filename + "_value_function_optimizer")
+        torch.save(self.optimizer_value_function.state_dict(), filename + "_value_function_optimizer")
     
     def load_critic(self, filename):
         self.value_function.load_state_dict(torch.load(filename + "_value_function"))
-        self.value_function_optimizer.load_state_dict(torch.load(filename + "_value_function_optimizer"))         
+        self.optimizer_value_function.load_state_dict(torch.load(filename + "_value_function_optimizer"))         
         
         
 

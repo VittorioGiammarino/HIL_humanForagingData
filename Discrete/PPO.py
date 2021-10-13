@@ -212,7 +212,7 @@ class PPO:
     def save_actor(self, filename):
         option = 0
         torch.save(self.actor.state_dict(), filename + f"_pi_lo_option_{option}")
-        torch.save(self.optimizer_actor.state_dict(), filename + f"_pi_lo_option_{option}")
+        torch.save(self.optimizer_actor.state_dict(), filename + f"_pi_lo_optimizer_option_{option}")
     
     def load_actor(self, filename):
         option = 0

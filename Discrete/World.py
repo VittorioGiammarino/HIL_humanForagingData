@@ -559,8 +559,8 @@ class Foraging:
         def __init__(self,  coins_location = coins_location_standard, init_state = np.array([0,0,0,8]), version = 'complete', max_episode_steps = 3000):
             self.state = init_state
             self.version = version
-            self.coin_initial = 0.1*coins_location_standard
-            self.coin_location = 0.1*coins_location_standard
+            self.coin_initial = 0.1*coins_location
+            self.coin_location = 0.1*coins_location
             self.observation_space = np.array([len(self.state)])
             if version == 'complete':
                 self.action_size = 8

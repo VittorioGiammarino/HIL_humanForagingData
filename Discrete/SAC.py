@@ -140,11 +140,11 @@ class SAC(object):
         self.actor_target = copy.deepcopy(self.actor)
         
     def save_critic(self, filename):
-        torch.save(self.Critic.state_dict(), filename + "_critic")
+        torch.save(self.critic.state_dict(), filename + "_critic")
         torch.save(self.critic_optimizer.state_dict(), filename + "_critic_optimizer")
     
     def load_critic(self, filename):
-        self.Critic.load_state_dict(torch.load(filename + "_critic"))
+        self.critic.load_state_dict(torch.load(filename + "_critic"))
         self.critic_optimizer.load_state_dict(torch.load(filename + "_critic_optimizer"))
-        self.Critic_target = copy.deepcopy(self.Critic)
+        self.critic_target = copy.deepcopy(self.critic)
 		
