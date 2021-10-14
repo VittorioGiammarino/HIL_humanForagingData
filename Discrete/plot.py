@@ -645,4 +645,15 @@ def load_obj(name):
 if not os.path.exists("./results/HIL_ablation_study"):
     os.makedirs("./results/HIL_ablation_study")
 
-save_obj(Results_dictionary, 'HIL_ablation_study/Sorted_results')
+# save_obj(Results_dictionary, 'HIL_ablation_study/Sorted_results')
+
+Results_Best_HIL_and_HRL = {}
+Results_Best_HIL_and_HRL["nOptions_1_supervised_False"] = 7
+Results_Best_HIL_and_HRL["nOptions_2_supervised_True"] = 6
+Results_Best_HIL_and_HRL["nOptions_2_supervised_False"] = 0
+Results_Best_HIL_and_HRL["nOptions_3_supervised_True"] = 2
+Results_Best_HIL_and_HRL["nOptions_3_supervised_False"] = 7
+
+save_obj(Results_Best_HIL_and_HRL, 'Results_Best_HIL_and_HRL')
+
+

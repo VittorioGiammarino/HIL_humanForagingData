@@ -128,7 +128,7 @@ def HRL(env, args, seed):
         Agent_HRL = H_PPO.H_PPO(**kwargs)
            
         if args.load_model and args.adv_reward:
-        	Agent_HRL.load_actor(f"./models/HRL/{args.policy}_HIL_True_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.seed}/{args.policy}_HIL_True_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.seed}")    
+        	Agent_HRL.load_actor(f"./models/HRL/{args.policy}_HIL_True_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.coins}/{args.policy}_HIL_True_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.coins}")    
         elif args.load_model and args.HIL and args.load_HIL_model:
             Agent_HRL.load_actor(f"./models/HIL_ablation_study/HIL_traj_{args.coins}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.load_HIL_model_seed}/HIL")         
         elif args.load_model and args.HIL:
@@ -162,7 +162,7 @@ def HRL(env, args, seed):
         Agent_RL = PPO.PPO(**kwargs)
         
         if args.load_model and args.adv_reward:
-        	Agent_HRL.load_actor(f"./models/HRL/{args.policy}_HIL_True_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.seed}/{args.policy}_HIL_True_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.seed}")    
+        	Agent_HRL.load_actor(f"./models/HRL/{args.policy}_HIL_True_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.coins}/{args.policy}_HIL_True_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.coins}")    
         elif args.load_model and args.HIL and args.load_HIL_model:
             Agent_HRL.load_actor(f"./models/HIL_ablation_study/HIL_traj_{args.coins}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.load_HIL_model_seed}/HIL")         
         elif args.load_model and args.HIL:
@@ -197,7 +197,7 @@ def HRL(env, args, seed):
         Agent_HRL = H_SAC.H_SAC(**kwargs)
         
         if args.load_model and args.adv_reward:
-        	Agent_HRL.load_actor(f"./models/HRL/{args.policy}_HIL_True_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.seed}/{args.policy}_HIL_True_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.seed}")    
+        	Agent_HRL.load_actor(f"./models/HRL/{args.policy}_HIL_True_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.coins}/{args.policy}_HIL_True_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.coins}")    
         elif args.load_model and args.HIL and args.load_HIL_model:
             Agent_HRL.load_actor(f"./models/HIL_ablation_study/HIL_traj_{args.coins}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.load_HIL_model_seed}/HIL")         
         elif args.load_model and args.HIL:
@@ -283,7 +283,7 @@ def HRL(env, args, seed):
         Agent_RL = SAC.SAC(**kwargs)
         
         if args.load_model and args.adv_reward:
-        	Agent_HRL.load_actor(f"./models/HRL/{args.policy}_HIL_True_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.seed}/{args.policy}_HIL_True_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.seed}")    
+        	Agent_HRL.load_actor(f"./models/HRL/{args.policy}_HIL_True_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.coins}/{args.policy}_HIL_True_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.coins}")    
         elif args.load_model and args.HIL and args.load_HIL_model:
             Agent_HRL.load_actor(f"./models/HIL_ablation_study/HIL_traj_{args.coins}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.load_HIL_model_seed}/HIL")         
         elif args.load_model and args.HIL:
@@ -374,6 +374,7 @@ if __name__ == "__main__":
     mean_len_trajs = int(np.mean(len_trajs))
     
     HIL_ablation_study_results = load_obj('HIL_ablation_study/Sorted_results')
+    Results_Best_HIL_and_HRL = load_obj('Results_Best_HIL_and_HRL')
     
     parser = argparse.ArgumentParser()
     #General
@@ -454,6 +455,7 @@ if __name__ == "__main__":
         corner_1 = np.concatenate((np.random.randint(-100,-80, size=(60,1)), np.random.randint(80, 100, size=(60,1))), axis=1)
         corner_2 = np.concatenate((np.random.randint(80,100, size=(60,1)), np.random.randint(-100, -80, size=(60,1))), axis=1)
         coins_location = np.concatenate((np.random.randint(-100,-80, size=(60,2)), np.random.randint(-10,10, size=(60,2)), np.random.randint(80,100, size=(60,2)), corner_1, corner_2, np.array([[101,101]])), axis=0)
+        args.coins = Results_Best_HIL_and_HRL["nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}"]
         env = World.Foraging.env(coins_location)
 
     evaluations, policy = train(env, args, args.seed)
