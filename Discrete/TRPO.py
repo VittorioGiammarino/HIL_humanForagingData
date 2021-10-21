@@ -207,12 +207,12 @@ class TRPO:
             ratio = actual_improv / approx_improv
     
             if ratio > success_ratio and actual_improv > 0 and kld_new < max_kl:
-                return new_params
+                return new_params, False
     
             eta *= 0.5
     
         print("The line search has failed!")
-        return old_params
+        return old_params, True
     
     def train(self, Entropy = False):
         
@@ -266,9 +266,9 @@ class TRPO:
         gradient = TRPO.get_flat_grads(L(), self.actor).detach()
         s = TRPO.conjugate_gradient(Hv, gradient).detach()
         Hs = Hv(s).detach()
-        new_params = TRPO.rescale_and_linesearch(self, gradient, s, Hs, L, kld, old_params)
+        new_params, Failed = TRPO.rescale_and_linesearch(self, gradient, s, Hs, L, kld, old_params)
         
-        if Entropy:
+        if Entropy and not Failed:
             _, entropy_log_prob = self.actor.sample_log(rollout_states, rollout_actions)
             discounted_casual_entropy = ((-1)*rollout_gammas*entropy_log_prob).mean()
             gradient_discounted_casual_entropy = TRPO.get_flat_grads(discounted_casual_entropy, self.actor)
@@ -277,20 +277,18 @@ class TRPO:
         TRPO.set_params(self.actor, new_params)
         
     def save_actor(self, filename):
-        torch.save(self.actor.state_dict(), filename + "_actor")
+        option = 0
+        torch.save(self.actor.state_dict(), filename + f"_pi_lo_option_{option}")
     
-    def load_actor(self, filename, HIL = False):
-        if HIL:
-            option = 0
-            self.actor.load_state_dict(torch.load(filename + f"_pi_lo_option_{option}"))
-        else:
-            self.actor.load_state_dict(torch.load(filename + "_actor"))
+    def load_actor(self, filename):
+        option = 0
+        self.actor.load_state_dict(torch.load(filename + f"_pi_lo_option_{option}"))
 
     def save_critic(self, filename):
         torch.save(self.value_function.state_dict(), filename + "_value_function")
     
     def load_critic(self, filename):
-        self.value_function.load_state_dict(torch.load(filename + "_value_function"))     
+        self.value_function.load_state_dict(torch.load(filename + "_value_function"))       
         
         
         

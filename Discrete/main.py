@@ -21,6 +21,8 @@ from evaluation import eval_policy
 
 import H_PPO
 import PPO
+import TRPO
+import UATRPO
 
 import H_SAC
 import SAC
@@ -127,10 +129,10 @@ def HRL(env, args, seed):
 
         Agent_HRL = H_PPO.H_PPO(**kwargs)
            
-        if args.load_model and args.adv_reward:
-        	Agent_HRL.load_actor(f"./models/HRL/{args.policy}_HIL_True_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.coins}/{args.policy}_HIL_True_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.coins}")    
-        elif args.load_model and args.HIL and args.load_HIL_model:
-            Agent_HRL.load_actor(f"./models/HIL_ablation_study/HIL_traj_{args.coins}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.load_HIL_model_seed}/HIL")         
+        if args.load_model and args.HIL and args.load_HIL_model:
+            Agent_HRL.load_actor(f"./models/HIL_ablation_study/HIL_traj_{args.coins}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.load_HIL_model_seed}/HIL")   
+        elif args.load_model and args.adv_reward:
+        	Agent_HRL.load_actor(f"./models/HRL/{args.policy}_HIL_True_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.coins}/{args.policy}_HIL_True_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.coins}")          
         elif args.load_model and args.HIL:
         	Agent_HRL.load_actor(f"./models/HRL/HIL/HIL_traj_{args.coins}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{seed}/HIL") 
                   	
@@ -161,12 +163,12 @@ def HRL(env, args, seed):
 
         Agent_RL = PPO.PPO(**kwargs)
         
-        if args.load_model and args.adv_reward:
-        	Agent_HRL.load_actor(f"./models/HRL/{args.policy}_HIL_True_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.coins}/{args.policy}_HIL_True_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.coins}")    
-        elif args.load_model and args.HIL and args.load_HIL_model:
-            Agent_HRL.load_actor(f"./models/HIL_ablation_study/HIL_traj_{args.coins}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.load_HIL_model_seed}/HIL")         
+        if args.load_model and args.HIL and args.load_HIL_model:
+            Agent_RL.load_actor(f"./models/HIL_ablation_study/HIL_traj_{args.coins}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.load_HIL_model_seed}/HIL")  
+        elif args.load_model and args.adv_reward:
+        	Agent_RL.load_actor(f"./models/HRL/{args.policy}_HIL_True_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.coins}/{args.policy}_HIL_True_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.coins}")           
         elif args.load_model and args.HIL:
-        	Agent_HRL.load_actor(f"./models/HRL/HIL/HIL_traj_{args.coins}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{seed}/HIL") 
+        	Agent_RL.load_actor(f"./models/HRL/HIL/HIL_traj_{args.coins}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{seed}/HIL") 
                   	
         # Evaluate untrained policy
         evaluation_RL = []
@@ -177,6 +179,142 @@ def HRL(env, args, seed):
                         
             _, _ = Agent_RL.GAE(env)
             Agent_RL.train(Entropy = True)
+                 
+            # Evaluate episode
+            if (i + 1) % args.eval_freq == 0:
+                avg_reward = eval_policy(seed, Agent_RL, env, args.evaluation_max_n_steps, args.evaluation_episodes, 'standard', TrainingSet[0,:])
+                evaluation_RL.append(avg_reward)      
+                 
+        return evaluation_RL, Agent_RL
+    
+    if args.policy == "TRPO":        
+        kwargs = {
+         "state_dim": state_dim,
+         "action_dim": action_dim,
+         "encoding_info": encoding_info,
+         "num_steps_per_rollout": args.number_steps_per_iter
+        }
+
+        Agent_RL = TRPO.TRPO(**kwargs)
+        
+        if args.load_model and args.HIL and args.load_HIL_model:
+            Agent_RL.load_actor(f"./models/HIL_ablation_study/HIL_traj_{args.coins}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.load_HIL_model_seed}/HIL")  
+        elif args.load_model and args.adv_reward:
+        	Agent_RL.load_actor(f"./models/HRL/{args.policy}_HIL_True_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.coins}/{args.policy}_HIL_True_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.coins}")           
+        elif args.load_model and args.HIL:
+        	Agent_RL.load_actor(f"./models/HRL/HIL/HIL_traj_{args.coins}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{seed}/HIL") 
+                  	
+        # Evaluate untrained policy
+        evaluation_RL = []
+        avg_reward = eval_policy(seed, Agent_RL, env, args.evaluation_max_n_steps, args.evaluation_episodes, 'standard', TrainingSet[0,:])
+        evaluation_RL.append(avg_reward) 
+        
+        for i in range(int(args.max_iter)):
+                        
+            _, _ = Agent_RL.GAE(env)
+            Agent_RL.train(Entropy = True)
+                 
+            # Evaluate episode
+            if (i + 1) % args.eval_freq == 0:
+                avg_reward = eval_policy(seed, Agent_RL, env, args.evaluation_max_n_steps, args.evaluation_episodes, 'standard', TrainingSet[0,:])
+                evaluation_RL.append(avg_reward)      
+                 
+        return evaluation_RL, Agent_RL
+    
+    if args.policy == "UATRPO":        
+        kwargs = {
+         "state_dim": state_dim,
+         "action_dim": action_dim,
+         "encoding_info": encoding_info,
+         "num_steps_per_rollout": args.number_steps_per_iter
+        }
+
+        Agent_RL = UATRPO.UATRPO(**kwargs)
+        
+        if args.load_model and args.HIL and args.load_HIL_model:
+            Agent_RL.load_actor(f"./models/HIL_ablation_study/HIL_traj_{args.coins}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.load_HIL_model_seed}/HIL")  
+        elif args.load_model and args.adv_reward:
+        	Agent_RL.load_actor(f"./models/HRL/{args.policy}_HIL_True_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.coins}/{args.policy}_HIL_True_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.coins}")           
+        elif args.load_model and args.HIL:
+        	Agent_RL.load_actor(f"./models/HRL/HIL/HIL_traj_{args.coins}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{seed}/HIL") 
+                  	
+        # Evaluate untrained policy
+        evaluation_RL = []
+        avg_reward = eval_policy(seed, Agent_RL, env, args.evaluation_max_n_steps, args.evaluation_episodes, 'standard', TrainingSet[0,:])
+        evaluation_RL.append(avg_reward) 
+        
+        for i in range(int(args.max_iter)):
+                        
+            _, _ = Agent_RL.GAE(env)
+            Agent_RL.train(Entropy = True)
+                 
+            # Evaluate episode
+            if (i + 1) % args.eval_freq == 0:
+                avg_reward = eval_policy(seed, Agent_RL, env, args.evaluation_max_n_steps, args.evaluation_episodes, 'standard', TrainingSet[0,:])
+                evaluation_RL.append(avg_reward)      
+                 
+        return evaluation_RL, Agent_RL
+    
+    if args.policy == "TRPO_entropy_false":        
+        kwargs = {
+         "state_dim": state_dim,
+         "action_dim": action_dim,
+         "encoding_info": encoding_info,
+         "num_steps_per_rollout": args.number_steps_per_iter
+        }
+
+        Agent_RL = TRPO.TRPO(**kwargs)
+        
+        if args.load_model and args.HIL and args.load_HIL_model:
+            Agent_RL.load_actor(f"./models/HIL_ablation_study/HIL_traj_{args.coins}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.load_HIL_model_seed}/HIL")  
+        elif args.load_model and args.adv_reward:
+        	Agent_RL.load_actor(f"./models/HRL/{args.policy}_HIL_True_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.coins}/{args.policy}_HIL_True_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.coins}")           
+        elif args.load_model and args.HIL:
+        	Agent_RL.load_actor(f"./models/HRL/HIL/HIL_traj_{args.coins}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{seed}/HIL") 
+                  	
+        # Evaluate untrained policy
+        evaluation_RL = []
+        avg_reward = eval_policy(seed, Agent_RL, env, args.evaluation_max_n_steps, args.evaluation_episodes, 'standard', TrainingSet[0,:])
+        evaluation_RL.append(avg_reward) 
+        
+        for i in range(int(args.max_iter)):
+                        
+            _, _ = Agent_RL.GAE(env)
+            Agent_RL.train(Entropy = False)
+                 
+            # Evaluate episode
+            if (i + 1) % args.eval_freq == 0:
+                avg_reward = eval_policy(seed, Agent_RL, env, args.evaluation_max_n_steps, args.evaluation_episodes, 'standard', TrainingSet[0,:])
+                evaluation_RL.append(avg_reward)      
+                 
+        return evaluation_RL, Agent_RL
+    
+    if args.policy == "UATRPO_entropy_false":        
+        kwargs = {
+         "state_dim": state_dim,
+         "action_dim": action_dim,
+         "encoding_info": encoding_info,
+         "num_steps_per_rollout": args.number_steps_per_iter
+        }
+
+        Agent_RL = UATRPO.UATRPO(**kwargs)
+        
+        if args.load_model and args.HIL and args.load_HIL_model:
+            Agent_RL.load_actor(f"./models/HIL_ablation_study/HIL_traj_{args.coins}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.load_HIL_model_seed}/HIL")  
+        elif args.load_model and args.adv_reward:
+        	Agent_RL.load_actor(f"./models/HRL/{args.policy}_HIL_True_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.coins}/{args.policy}_HIL_True_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.coins}")           
+        elif args.load_model and args.HIL:
+        	Agent_RL.load_actor(f"./models/HRL/HIL/HIL_traj_{args.coins}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{seed}/HIL") 
+                  	
+        # Evaluate untrained policy
+        evaluation_RL = []
+        avg_reward = eval_policy(seed, Agent_RL, env, args.evaluation_max_n_steps, args.evaluation_episodes, 'standard', TrainingSet[0,:])
+        evaluation_RL.append(avg_reward) 
+        
+        for i in range(int(args.max_iter)):
+                        
+            _, _ = Agent_RL.GAE(env)
+            Agent_RL.train(Entropy = False)
                  
             # Evaluate episode
             if (i + 1) % args.eval_freq == 0:
@@ -196,10 +334,10 @@ def HRL(env, args, seed):
 
         Agent_HRL = H_SAC.H_SAC(**kwargs)
         
-        if args.load_model and args.adv_reward:
-        	Agent_HRL.load_actor(f"./models/HRL/{args.policy}_HIL_True_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.coins}/{args.policy}_HIL_True_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.coins}")    
-        elif args.load_model and args.HIL and args.load_HIL_model:
-            Agent_HRL.load_actor(f"./models/HIL_ablation_study/HIL_traj_{args.coins}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.load_HIL_model_seed}/HIL")         
+        if args.load_model and args.HIL and args.load_HIL_model:
+            Agent_HRL.load_actor(f"./models/HIL_ablation_study/HIL_traj_{args.coins}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.load_HIL_model_seed}/HIL")
+        elif args.load_model and args.adv_reward:
+        	Agent_HRL.load_actor(f"./models/HRL/{args.policy}_HIL_True_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.coins}/{args.policy}_HIL_True_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.coins}")             
         elif args.load_model and args.HIL:
         	Agent_HRL.load_actor(f"./models/HRL/HIL/HIL_traj_{args.coins}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{seed}/HIL") 
                   	
@@ -281,13 +419,13 @@ def HRL(env, args, seed):
         }
 
         Agent_RL = SAC.SAC(**kwargs)
-        
-        if args.load_model and args.adv_reward:
-        	Agent_HRL.load_actor(f"./models/HRL/{args.policy}_HIL_True_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.coins}/{args.policy}_HIL_True_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.coins}")    
-        elif args.load_model and args.HIL and args.load_HIL_model:
-            Agent_HRL.load_actor(f"./models/HIL_ablation_study/HIL_traj_{args.coins}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.load_HIL_model_seed}/HIL")         
+            
+        if args.load_model and args.HIL and args.load_HIL_model:
+            Agent_RL.load_actor(f"./models/HIL_ablation_study/HIL_traj_{args.coins}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.load_HIL_model_seed}/HIL")   
+        elif args.load_model and args.adv_reward:
+        	Agent_RL.load_actor(f"./models/HRL/{args.policy}_HIL_True_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.coins}/{args.policy}_HIL_True_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.coins}")      
         elif args.load_model and args.HIL:
-        	Agent_HRL.load_actor(f"./models/HRL/HIL/HIL_traj_{args.coins}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{seed}/HIL") 
+        	Agent_RL.load_actor(f"./models/HRL/HIL/HIL_traj_{args.coins}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{seed}/HIL") 
                   	
         # Evaluate untrained policy
         evaluation_RL = []
@@ -423,7 +561,7 @@ if __name__ == "__main__":
     if not os.path.exists("./models/HRL/HIL/"):
         os.makedirs("./models/HRL/HIL")
         
-    if args.policy == "PPO" or args.policy == "SAC":
+    if args.policy == "PPO" or args.policy == "SAC" or args.policy == "TRPO" or args.policy == "UATRPO":
         args.number_options = 1
         args.pi_hi_supervised = False
         
@@ -454,8 +592,18 @@ if __name__ == "__main__":
         np.random.seed(0)
         corner_1 = np.concatenate((np.random.randint(-100,-80, size=(60,1)), np.random.randint(80, 100, size=(60,1))), axis=1)
         corner_2 = np.concatenate((np.random.randint(80,100, size=(60,1)), np.random.randint(-100, -80, size=(60,1))), axis=1)
-        coins_location = np.concatenate((np.random.randint(-100,-80, size=(60,2)), np.random.randint(-10,10, size=(60,2)), np.random.randint(80,100, size=(60,2)), corner_1, corner_2, np.array([[101,101]])), axis=0)
-        args.coins = Results_Best_HIL_and_HRL["nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}"]
+        coins_location = np.concatenate((np.random.randint(-100,-80, size=(60,2)), np.random.randint(-10,10, size=(60,2)), np.random.randint(80,100, size=(60,2)), corner_1, corner_2, np.array([[110,110]])), axis=0)
+        args.coins = Results_Best_HIL_and_HRL[f"nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}"]
+        env = World.Foraging.env(coins_location)
+        
+    if args.adv_reward and args.load_HIL_model:
+        args.load_HIL_model_seed = HIL_ablation_study_results[f'Best_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}']['seed']
+        args.load_HIL_model_expert_traj = HIL_ablation_study_results[f'Best_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}']['expert traj']
+        args.coins = args.load_HIL_model_expert_traj
+        np.random.seed(0)
+        corner_1 = np.concatenate((np.random.randint(-100,-80, size=(60,1)), np.random.randint(80, 100, size=(60,1))), axis=1)
+        corner_2 = np.concatenate((np.random.randint(80,100, size=(60,1)), np.random.randint(-100, -80, size=(60,1))), axis=1)
+        coins_location = np.concatenate((np.random.randint(-100,-80, size=(60,2)), np.random.randint(-10,10, size=(60,2)), np.random.randint(80,100, size=(60,2)), corner_1, corner_2, np.array([[110,110]])), axis=0)
         env = World.Foraging.env(coins_location)
 
     evaluations, policy = train(env, args, args.seed)

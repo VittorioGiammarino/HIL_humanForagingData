@@ -6,14 +6,14 @@
 
 #$ -j y
 
-#$ -N HPPO_nOptions2_supervised_true_seed_7
+#$ -N HPPO_nOptions2_HIL_model_supervised_true_adv_reward_seed_7
 
 #$ -V
 
-#$ -pe omp 8
+#$ -pe omp 4
 #$ -l mem_per_core=4G
 
 module load python3/3.8.10
 module load pytorch/1.9.0
 
-python main.py --number_options 2 --policy HPPO --seed 7 --pi_hi_supervised
+python main.py --number_options 2 --policy HPPO --seed 7 --pi_hi_supervised --adv_reward --max_iter 100 --HIL --load_HIL_model

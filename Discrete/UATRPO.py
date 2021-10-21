@@ -17,7 +17,7 @@ from models import Value_net
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class UATRPO:
-    def __init__(self, state_dim, action_dim, encoding_info = None, num_steps_per_rollout=5000, gae_gamma = 0.99, gae_lambda = 0.99, 
+    def __init__(self, state_dim, action_dim, encoding_info = None, num_steps_per_rollout=15000, gae_gamma = 0.99, gae_lambda = 0.99, 
                  epsilon = 0.03, conj_grad_damping=0.1, random_projections = 200, beta = 0.9, alpha = 0.05, c=6e-4, lambda_ = 1e-3):
         
         self.actor = SoftmaxHierarchicalActor.NN_PI_LO(state_dim, action_dim).to(device)
@@ -222,12 +222,12 @@ class UATRPO:
             ratio = actual_improv / approx_improv
     
             if ratio > success_ratio and actual_improv > 0 and kld_new < max_kl*delta_mult:
-                return new_params
+                return new_params, False
     
             eta_v *= 0.7
     
         print("The line search was failed!")
-        return old_params
+        return old_params, True
     
     def train(self, Entropy=False):
         
@@ -342,9 +342,9 @@ class UATRPO:
         Fv = Hv(eta_v_flat).detach()
         Sv = Sigmav(eta_v_flat).detach()
         
-        new_params = UATRPO.rescale_and_linesearch(self, gradient, eta_v_flat, Fv, Sv, L, Rn2, kld, old_params)
+        new_params, Failed = UATRPO.rescale_and_linesearch(self, gradient, eta_v_flat, Fv, Sv, L, Rn2, kld, old_params)
 
-        if Entropy:
+        if Entropy and not Failed:
             _, entropy_log_prob = self.actor.sample_log(rollout_states, rollout_actions)
             discounted_casual_entropy = ((-1)*rollout_gammas*entropy_log_prob).mean()
             gradient_discounted_casual_entropy = UATRPO.get_flat_grads(discounted_casual_entropy, self.actor)
@@ -357,20 +357,18 @@ class UATRPO:
         self.beta_t += 1
         
     def save_actor(self, filename):
-        torch.save(self.actor.state_dict(), filename + "_actor")
+        option = 0
+        torch.save(self.actor.state_dict(), filename + f"_pi_lo_option_{option}")
     
-    def load_actor(self, filename, HIL = False):
-        if HIL:
-            option = 0
-            self.actor.load_state_dict(torch.load(filename + f"_pi_lo_option_{option}"))
-        else:
-            self.actor.load_state_dict(torch.load(filename + "_actor"))
+    def load_actor(self, filename):
+        option = 0
+        self.actor.load_state_dict(torch.load(filename + f"_pi_lo_option_{option}"))
 
     def save_critic(self, filename):
         torch.save(self.value_function.state_dict(), filename + "_value_function")
     
     def load_critic(self, filename):
-        self.value_function.load_state_dict(torch.load(filename + "_value_function"))            
+        self.value_function.load_state_dict(torch.load(filename + "_value_function"))                 
         
         
         

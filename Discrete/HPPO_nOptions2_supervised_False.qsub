@@ -6,7 +6,7 @@
 
 #$ -j y
 
-#$ -N HPPO_nOptions2_HIL_false_seed_7
+#$ -N HPPO_nOptions2_HIL_model_adv_reward_seed_7
 
 #$ -V
 
@@ -16,4 +16,4 @@
 module load python3/3.8.10
 module load pytorch/1.9.0
 
-python main.py --number_options 2 --policy HPPO --HIL --seed 7 
+python main.py --number_options 2 --policy HPPO --seed 7 --adv_reward --max_iter 100 --HIL --load_HIL_model
