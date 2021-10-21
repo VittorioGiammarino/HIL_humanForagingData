@@ -656,4 +656,31 @@ Results_Best_HIL_and_HRL["nOptions_3_supervised_False"] = 7
 
 save_obj(Results_Best_HIL_and_HRL, 'Results_Best_HIL_and_HRL')
 
+# %%
+
+coins_array = [2, 10, 13, 16, 17, 29, 30, 35, 40, 41, 42, 43, 44, 46, 49]
+
+HIL_best_nOptions_1 = {}
+best_reward_nOptions_1_supervised_False = 0
+
+for trj in coins_array:
+    HIL_nOptions_1_supervised_False = []
+    HIL_best_nOptions_1_traj = {}
+    
+    HIL_best_nOptions_1[f'HIL_traj_{trj}_nOptions_1_supervised_False'] = HIL_best_nOptions_1_traj
+    
+    for i in range(8):        
+        with open(f'results/HRL/HIL_traj_{trj}_nOptions_1_supervised_False_{i}.npy', 'rb') as f:
+            HIL_nOptions_1_supervised_False.append(np.load(f, allow_pickle=True))
+    
+    reward_array = np.array(HIL_nOptions_1_supervised_False)
+    
+    best_seed = np.argmax(reward_array[:,-1])
+    
+    HIL_best_nOptions_1[f'HIL_traj_{trj}_nOptions_1_supervised_False']['best_seed'] = best_seed
+    HIL_best_nOptions_1[f'HIL_traj_{trj}_nOptions_1_supervised_False']['traj'] = trj
+    
+
+save_obj(HIL_best_nOptions_1, 'HIL_ablation_study/Best_results_nOptions_1')
+
 

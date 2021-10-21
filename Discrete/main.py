@@ -513,6 +513,7 @@ if __name__ == "__main__":
     
     HIL_ablation_study_results = load_obj('HIL_ablation_study/Sorted_results')
     Results_Best_HIL_and_HRL = load_obj('Results_Best_HIL_and_HRL')
+    Best_results_nOptions_1 = load_obj('HIL_ablation_study/Best_results_nOptions_1')
     
     parser = argparse.ArgumentParser()
     #General
@@ -580,9 +581,20 @@ if __name__ == "__main__":
         os.makedirs(f"./models/HRL/{file_name}")
         
     if args.load_HIL_model:
-        args.load_HIL_model_seed = HIL_ablation_study_results[f'Best_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}']['seed']
-        args.load_HIL_model_expert_traj = HIL_ablation_study_results[f'Best_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}']['expert traj']
+        # args.load_HIL_model_seed = HIL_ablation_study_results[f'Best_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}']['seed']
+        # args.load_HIL_model_expert_traj = HIL_ablation_study_results[f'Best_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}']['expert traj']
+        # args.coins = args.load_HIL_model_expert_traj
+        
+        args.load_HIL_model_seed = Best_results_nOptions_1[f'HIL_traj_{args.load_HIL_model_expert_traj}_nOptions_1_supervised_False']['best_seed']
+        args.load_HIL_model_expert_traj = Best_results_nOptions_1[f'HIL_traj_{args.load_HIL_model_expert_traj}_nOptions_1_supervised_False']['traj']
         args.coins = args.load_HIL_model_expert_traj
+        
+        file_name = f"{args.policy}_HIL_{args.HIL}_traj_{args.load_HIL_model_expert_traj}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.seed}"
+        print("---------------------------------------")
+        print(f"Policy: {args.policy}, HIL: {args.HIL}, Human Traj: {args.load_HIL_model_expert_traj}, nOptions: {args.number_options}, Supervised: {args.pi_hi_supervised}, Env: {args.env}, Seed: {args.seed}")
+        print("---------------------------------------")
+        
+        
      
     coins_distribution = 2 # we standardize the exact coins position throughout the experiments    
     coins_location = Coins_location[coins_distribution,:,:] 
