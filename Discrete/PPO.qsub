@@ -6,7 +6,7 @@
 
 #$ -j y
 
-#$ -N PPO_HIL_model_adv_reward_seed_7
+#$ -N PPO_HIL_True_Human_Traj_49_seed_7
 
 #$ -V
 
@@ -16,6 +16,6 @@
 module load python3/3.8.10
 module load pytorch/1.9.0
 
-python main.py --number_options 1 --policy PPO --seed 7 --adv_reward --max_iter 100 --HIL --load_HIL_model
+python main.py --number_options 1 --policy PPO --seed 7 --HIL --load_HIL_model --load_HIL_model_expert_traj 49
 
 
