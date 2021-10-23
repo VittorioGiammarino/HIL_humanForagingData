@@ -577,8 +577,6 @@ if __name__ == "__main__":
         print("ADV_Reward")
         print("---------------------------------------")
         
-    if not os.path.exists(f"./models/HRL/{file_name}"):
-        os.makedirs(f"./models/HRL/{file_name}")
         
     if args.load_HIL_model:
         # args.load_HIL_model_seed = HIL_ablation_study_results[f'Best_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}']['seed']
@@ -594,7 +592,8 @@ if __name__ == "__main__":
         print(f"Policy: {args.policy}, HIL: {args.HIL}, Human Traj: {args.load_HIL_model_expert_traj}, nOptions: {args.number_options}, Supervised: {args.pi_hi_supervised}, Env: {args.env}, Seed: {args.seed}")
         print("---------------------------------------")
         
-        
+    if not os.path.exists(f"./models/HRL/{file_name}"):
+        os.makedirs(f"./models/HRL/{file_name}")
      
     coins_distribution = 2 # we standardize the exact coins position throughout the experiments    
     coins_location = Coins_location[coins_distribution,:,:] 
