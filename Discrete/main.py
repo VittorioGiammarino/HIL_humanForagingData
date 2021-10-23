@@ -99,10 +99,19 @@ def HIL(env, args, seed):
     # Save
     np.save(f"./results/HRL/HIL_traj_{args.coins}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{seed}", evaluation_HIL)
     
-    if not os.path.exists(f"./models/HRL/HIL/HIL_traj_{args.coins}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{seed}"):
-        os.makedirs(f"./models/HRL/HIL/HIL_traj_{args.coins}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{seed}")
+    if args.mode == "HIL_HRL":
     
-    Agent_BatchHIL_torch.save(f"./models/HRL/HIL/HIL_traj_{args.coins}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{seed}/HIL")
+        if not os.path.exists(f"./models/HRL/HIL/HIL_traj_{args.coins}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{seed}"):
+            os.makedirs(f"./models/HRL/HIL/HIL_traj_{args.coins}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{seed}")
+        
+        Agent_BatchHIL_torch.save(f"./models/HRL/HIL/HIL_traj_{args.coins}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{seed}/HIL")
+        
+    elif args.mode == "HIL_ablation_study":
+        
+        if not os.path.exists(f"./models/HIL_ablation_study/HIL_traj_{args.coins}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{seed}"):
+            os.makedirs(f"./models/HIL_ablation_study/HIL_traj_{args.coins}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{seed}")
+        
+        Agent_BatchHIL_torch.save(f"./models/HIL_ablation_study/HIL_traj_{args.coins}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{seed}/HIL")
     
     
 def HRL(env, args, seed):
@@ -517,6 +526,7 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser()
     #General
+    parser.add_argument("--mode", default="HIL_HRL")     # number of options
     parser.add_argument("--number_options", default=3, type=int)     # number of options
     parser.add_argument("--policy", default="SAC")                   # Policy name (TD3, DDPG or OurDDPG)
     parser.add_argument("--seed", default=10, type=int)               # Sets Gym, PyTorch and Numpy seeds
@@ -550,79 +560,129 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     
-    file_name = f"{args.policy}_HIL_{args.HIL}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.seed}"
-    print("---------------------------------------")
-    print(f"Policy: {args.policy}, HIL: {args.HIL}, nOptions: {args.number_options}, Supervised: {args.pi_hi_supervised}, Env: {args.env}, Seed: {args.seed}")
-    print("---------------------------------------")
-        
-       
-    if not os.path.exists("./results/HRL"):
-        os.makedirs("./results/HRL")
-               
-    if not os.path.exists("./models/HRL/HIL/"):
-        os.makedirs("./models/HRL/HIL")
-        
-    if args.policy == "PPO" or args.policy == "SAC" or args.policy == "TRPO" or args.policy == "UATRPO":
-        args.number_options = 1
-        args.pi_hi_supervised = False
-        
+    if args.mode == "HIL_HRL":
+    
         file_name = f"{args.policy}_HIL_{args.HIL}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.seed}"
         print("---------------------------------------")
         print(f"Policy: {args.policy}, HIL: {args.HIL}, nOptions: {args.number_options}, Supervised: {args.pi_hi_supervised}, Env: {args.env}, Seed: {args.seed}")
         print("---------------------------------------")
-        
-    if args.adv_reward:
-        file_name = f"{args.policy}_HIL_{args.HIL}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_ADV_Reward_{args.adv_reward}_{args.seed}"
-        print("---------------------------------------")
-        print("ADV_Reward")
-        print("---------------------------------------")
-        
-        
-    if args.load_HIL_model:
-        # args.load_HIL_model_seed = HIL_ablation_study_results[f'Best_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}']['seed']
-        # args.load_HIL_model_expert_traj = HIL_ablation_study_results[f'Best_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}']['expert traj']
-        # args.coins = args.load_HIL_model_expert_traj
-        
-        args.load_HIL_model_seed = Best_results_nOptions_1[f'HIL_traj_{args.load_HIL_model_expert_traj}_nOptions_1_supervised_False']['best_seed']
-        args.load_HIL_model_expert_traj = Best_results_nOptions_1[f'HIL_traj_{args.load_HIL_model_expert_traj}_nOptions_1_supervised_False']['traj']
-        args.coins = args.load_HIL_model_expert_traj
-        
-        file_name = f"{args.policy}_HIL_{args.HIL}_traj_{args.load_HIL_model_expert_traj}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.seed}"
-        print("---------------------------------------")
-        print(f"Policy: {args.policy}, HIL: {args.HIL}, Human Traj: {args.load_HIL_model_expert_traj}, nOptions: {args.number_options}, Supervised: {args.pi_hi_supervised}, Env: {args.env}, Seed: {args.seed}")
-        print("---------------------------------------")
-        
-    if not os.path.exists(f"./models/HRL/{file_name}"):
-        os.makedirs(f"./models/HRL/{file_name}")
-     
-    coins_distribution = 2 # we standardize the exact coins position throughout the experiments    
-    coins_location = Coins_location[coins_distribution,:,:] 
-    env = World.Foraging.env(coins_location)
-    
-    if args.adv_reward:
-        np.random.seed(0)
-        corner_1 = np.concatenate((np.random.randint(-100,-80, size=(60,1)), np.random.randint(80, 100, size=(60,1))), axis=1)
-        corner_2 = np.concatenate((np.random.randint(80,100, size=(60,1)), np.random.randint(-100, -80, size=(60,1))), axis=1)
-        coins_location = np.concatenate((np.random.randint(-100,-80, size=(60,2)), np.random.randint(-10,10, size=(60,2)), np.random.randint(80,100, size=(60,2)), corner_1, corner_2, np.array([[110,110]])), axis=0)
-        args.coins = Results_Best_HIL_and_HRL[f"nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}"]
+               
+        if not os.path.exists("./results/HRL"):
+            os.makedirs("./results/HRL")
+                   
+        if not os.path.exists("./models/HRL/HIL/"):
+            os.makedirs("./models/HRL/HIL")
+            
+        if args.policy == "PPO" or args.policy == "SAC" or args.policy == "TRPO" or args.policy == "UATRPO":
+            args.number_options = 1
+            args.pi_hi_supervised = False
+            
+            file_name = f"{args.policy}_HIL_{args.HIL}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.seed}"
+            print("---------------------------------------")
+            print(f"Policy: {args.policy}, HIL: {args.HIL}, nOptions: {args.number_options}, Supervised: {args.pi_hi_supervised}, Env: {args.env}, Seed: {args.seed}")
+            print("---------------------------------------")
+            
+        if args.adv_reward:
+            file_name = f"{args.policy}_HIL_{args.HIL}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_ADV_Reward_{args.adv_reward}_{args.seed}"
+            print("---------------------------------------")
+            print("ADV_Reward")
+            print("---------------------------------------")
+            
+            
+        if args.load_HIL_model:
+            # args.load_HIL_model_seed = HIL_ablation_study_results[f'Best_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}']['seed']
+            # args.load_HIL_model_expert_traj = HIL_ablation_study_results[f'Best_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}']['expert traj']
+            # args.coins = args.load_HIL_model_expert_traj
+            
+            args.load_HIL_model_seed = Best_results_nOptions_1[f'HIL_traj_{args.load_HIL_model_expert_traj}_nOptions_1_supervised_False']['best_seed']
+            args.load_HIL_model_expert_traj = Best_results_nOptions_1[f'HIL_traj_{args.load_HIL_model_expert_traj}_nOptions_1_supervised_False']['traj']
+            args.coins = args.load_HIL_model_expert_traj
+            
+            file_name = f"{args.policy}_HIL_{args.HIL}_traj_{args.load_HIL_model_expert_traj}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.seed}"
+            print("---------------------------------------")
+            print(f"Policy: {args.policy}, HIL: {args.HIL}, Human Traj: {args.load_HIL_model_expert_traj}, nOptions: {args.number_options}, Supervised: {args.pi_hi_supervised}, Env: {args.env}, Seed: {args.seed}")
+            print("---------------------------------------")
+            
+        if not os.path.exists(f"./models/HRL/{file_name}"):
+            os.makedirs(f"./models/HRL/{file_name}")
+         
+        coins_distribution = args.coins    
+        coins_location = Coins_location[coins_distribution,:,:] 
         env = World.Foraging.env(coins_location)
         
-    if args.adv_reward and args.load_HIL_model:
-        args.load_HIL_model_seed = HIL_ablation_study_results[f'Best_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}']['seed']
-        args.load_HIL_model_expert_traj = HIL_ablation_study_results[f'Best_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}']['expert traj']
-        args.coins = args.load_HIL_model_expert_traj
-        np.random.seed(0)
-        corner_1 = np.concatenate((np.random.randint(-100,-80, size=(60,1)), np.random.randint(80, 100, size=(60,1))), axis=1)
-        corner_2 = np.concatenate((np.random.randint(80,100, size=(60,1)), np.random.randint(-100, -80, size=(60,1))), axis=1)
-        coins_location = np.concatenate((np.random.randint(-100,-80, size=(60,2)), np.random.randint(-10,10, size=(60,2)), np.random.randint(80,100, size=(60,2)), corner_1, corner_2, np.array([[110,110]])), axis=0)
-        env = World.Foraging.env(coins_location)
-
-    evaluations, policy = train(env, args, args.seed)
+        if args.adv_reward:
+            np.random.seed(0)
+            corner_1 = np.concatenate((np.random.randint(-100,-80, size=(60,1)), np.random.randint(80, 100, size=(60,1))), axis=1)
+            corner_2 = np.concatenate((np.random.randint(80,100, size=(60,1)), np.random.randint(-100, -80, size=(60,1))), axis=1)
+            coins_location = np.concatenate((np.random.randint(-100,-80, size=(60,2)), np.random.randint(-10,10, size=(60,2)), np.random.randint(80,100, size=(60,2)), corner_1, corner_2, np.array([[110,110]])), axis=0)
+            args.coins = Results_Best_HIL_and_HRL[f"nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}"]
+            env = World.Foraging.env(coins_location)
+            
+        if args.adv_reward and args.load_HIL_model:
+            args.load_HIL_model_seed = HIL_ablation_study_results[f'Best_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}']['seed']
+            args.load_HIL_model_expert_traj = HIL_ablation_study_results[f'Best_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}']['expert traj']
+            args.coins = args.load_HIL_model_expert_traj
+            np.random.seed(0)
+            corner_1 = np.concatenate((np.random.randint(-100,-80, size=(60,1)), np.random.randint(80, 100, size=(60,1))), axis=1)
+            corner_2 = np.concatenate((np.random.randint(80,100, size=(60,1)), np.random.randint(-100, -80, size=(60,1))), axis=1)
+            coins_location = np.concatenate((np.random.randint(-100,-80, size=(60,2)), np.random.randint(-10,10, size=(60,2)), np.random.randint(80,100, size=(60,2)), corner_1, corner_2, np.array([[110,110]])), axis=0)
+            env = World.Foraging.env(coins_location)
     
-    if args.save_model: 
-        np.save(f"./results/HRL/evaluation_{file_name}", evaluations)
-        policy.save_actor(f"./models/HRL/{file_name}/{file_name}")
-        policy.save_critic(f"./models/HRL/{file_name}/{file_name}")
+        evaluations, policy = train(env, args, args.seed)
+        
+        if args.save_model: 
+            np.save(f"./results/HRL/evaluation_{file_name}", evaluations)
+            policy.save_actor(f"./models/HRL/{file_name}/{file_name}")
+            policy.save_critic(f"./models/HRL/{file_name}/{file_name}")
+            
+    elif args.mode == "HIL_ablation_study":
+        
+        print("---------------------------------------")
+        print("HIL ablation study")
+        print("---------------------------------------")
+        
+        
+        if not os.path.exists("./results/HRL"):
+            os.makedirs("./results/HRL")
+                   
+        if not os.path.exists("./models/HIL_ablation_study"):
+            os.makedirs("./models//HIL_ablation_study")
+        
+        for traj in range(len(Trajectories)):
+        
+            supervised_array = [True, False]
+            
+            for supervised in supervised_array:
+                args.supervised = supervised
+                if supervised == True:
+                    nOptions_min = 2
+                else:
+                    nOptions_min = 1
+                    
+                for options in range(nOptions_min, 4):
+                    args.number_options = options
+                    
+                    coins_distribution = traj # we standardize the exact coins position throughout the experiments    
+                    coins_location = Coins_location[coins_distribution,:,:] 
+                    env = World.Foraging.env(coins_location)
+                    
+                    # Set seeds
+                    env.Seed(args.seed)
+                    torch.manual_seed(args.seed)
+                    np.random.seed(args.seed)
+                    
+                    HIL(env, args, args.seed)
+                    
+                    
+                
+                
+                
+                
+        
+        
+        
+        
+        
                 
     
 
