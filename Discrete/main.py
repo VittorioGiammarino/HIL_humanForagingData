@@ -641,6 +641,7 @@ if __name__ == "__main__":
         print("HIL ablation study")
         print("---------------------------------------")
         
+        args.HIL = True
         
         if not os.path.exists("./results/HRL"):
             os.makedirs("./results/HRL")
@@ -650,19 +651,21 @@ if __name__ == "__main__":
         
         for traj in range(len(Trajectories)):
         
-            supervised_array = [True, False]
+            supervised_array = [False, True]
             
             for supervised in supervised_array:
-                args.supervised = supervised
                 if supervised == True:
                     nOptions_min = 2
+                    args.pi_hi_supervised = True
                 else:
                     nOptions_min = 1
+                    args.pi_hi_supervised = False
                     
                 for options in range(nOptions_min, 4):
                     args.number_options = options
                     
-                    coins_distribution = traj # we standardize the exact coins position throughout the experiments    
+                    args.coins = traj
+                    coins_distribution = args.coins # we standardize the exact coins position throughout the experiments    
                     coins_location = Coins_location[coins_distribution,:,:] 
                     env = World.Foraging.env(coins_location)
                     
