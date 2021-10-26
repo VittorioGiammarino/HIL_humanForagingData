@@ -356,7 +356,7 @@ if not os.path.exists("./Figures/HIL_ablation_study"):
     os.makedirs("./Figures/HIL_ablation_study")
 
 
-coins_array = [2, 10, 13, 16, 17, 29, 30, 35, 40, 41, 42, 43, 44, 46, 49]
+coins_array = range(50)
 
 Results_dictionary = {}
 
@@ -383,6 +383,7 @@ Best_nOptions_2_supervised_False_dict = {}
 Best_nOptions_3_supervised_False_dict = {}
 Best_nOptions_2_supervised_True_dict = {}
 Best_nOptions_3_supervised_True_dict = {}
+
 
 for trj in coins_array:
     HIL_traj_2_nOptions_1_supervised_False = []
@@ -632,6 +633,8 @@ ax.set_ylabel('Reward')
 ax.set_title('Comparison')
 plt.savefig('Figures/HIL_ablation_study/HIL_over_trajs_comparison_std_off.pdf', format='pdf', bbox_inches='tight')
 
+
+
 # %%
 
 def save_obj(obj, name):
@@ -645,23 +648,12 @@ def load_obj(name):
 if not os.path.exists("./results/HIL_ablation_study"):
     os.makedirs("./results/HIL_ablation_study")
 
-# save_obj(Results_dictionary, 'HIL_ablation_study/Sorted_results')
+save_obj(Results_dictionary, 'HIL_ablation_study/Sorted_results')
 
-Results_Best_HIL_and_HRL = {}
-Results_Best_HIL_and_HRL["nOptions_1_supervised_False"] = 7
-Results_Best_HIL_and_HRL["nOptions_2_supervised_True"] = 6
-Results_Best_HIL_and_HRL["nOptions_2_supervised_False"] = 0
-Results_Best_HIL_and_HRL["nOptions_3_supervised_True"] = 2
-Results_Best_HIL_and_HRL["nOptions_3_supervised_False"] = 7
-
-save_obj(Results_Best_HIL_and_HRL, 'Results_Best_HIL_and_HRL')
 
 # %%
 
-coins_array = [2, 10, 13, 16, 17, 29, 30, 35, 40, 41, 42, 43, 44, 46, 49]
-
 HIL_best_nOptions_1 = {}
-best_reward_nOptions_1_supervised_False = 0
 
 for trj in coins_array:
     HIL_nOptions_1_supervised_False = []
@@ -683,4 +675,24 @@ for trj in coins_array:
 
 save_obj(HIL_best_nOptions_1, 'HIL_ablation_study/Best_results_nOptions_1')
 
+# %%
 
+def save_obj(obj, name):
+    with open('results/'+ name + '.pkl', 'wb') as f:
+        pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
+
+def load_obj(name):
+    with open('results/' + name + '.pkl', 'rb') as f:
+        return pickle.load(f)
+
+if not os.path.exists("./results/HIL_ablation_study"):
+    os.makedirs("./results/HIL_ablation_study")
+
+Results_Best_HIL_and_HRL = {}
+Results_Best_HIL_and_HRL["nOptions_1_supervised_False"] = 7
+Results_Best_HIL_and_HRL["nOptions_2_supervised_True"] = 6
+Results_Best_HIL_and_HRL["nOptions_2_supervised_False"] = 0
+Results_Best_HIL_and_HRL["nOptions_3_supervised_True"] = 2
+Results_Best_HIL_and_HRL["nOptions_3_supervised_False"] = 7
+
+save_obj(Results_Best_HIL_and_HRL, 'Results_Best_HIL_and_HRL')
