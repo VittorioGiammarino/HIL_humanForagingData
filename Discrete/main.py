@@ -559,7 +559,7 @@ if __name__ == "__main__":
     parser.add_argument("--adv_reward", action="store_true") 
     
     args = parser.parse_args()
-    
+        
     if args.mode == "HIL_HRL":
     
         file_name = f"{args.policy}_HIL_{args.HIL}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.seed}"
@@ -590,13 +590,13 @@ if __name__ == "__main__":
             
             
         if args.load_HIL_model:
-            # args.load_HIL_model_seed = HIL_ablation_study_results[f'Best_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}']['seed']
-            # args.load_HIL_model_expert_traj = HIL_ablation_study_results[f'Best_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}']['expert traj']
-            # args.coins = args.load_HIL_model_expert_traj
-            
-            args.load_HIL_model_seed = Best_results_nOptions_1[f'HIL_traj_{args.load_HIL_model_expert_traj}_nOptions_1_supervised_False']['best_seed']
-            args.load_HIL_model_expert_traj = Best_results_nOptions_1[f'HIL_traj_{args.load_HIL_model_expert_traj}_nOptions_1_supervised_False']['traj']
+            args.load_HIL_model_seed = HIL_ablation_study_results[f'Best_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}']['seed']
+            args.load_HIL_model_expert_traj = HIL_ablation_study_results[f'Best_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}']['expert traj']
             args.coins = args.load_HIL_model_expert_traj
+            
+            # args.load_HIL_model_seed = Best_results_nOptions_1[f'HIL_traj_{args.load_HIL_model_expert_traj}_nOptions_1_supervised_False']['best_seed']
+            # args.load_HIL_model_expert_traj = Best_results_nOptions_1[f'HIL_traj_{args.load_HIL_model_expert_traj}_nOptions_1_supervised_False']['traj']
+            # args.coins = args.load_HIL_model_expert_traj
             
             file_name = f"{args.policy}_HIL_{args.HIL}_traj_{args.load_HIL_model_expert_traj}_nOptions_{args.number_options}_supervised_{args.pi_hi_supervised}_{args.seed}"
             print("---------------------------------------")

@@ -6,7 +6,7 @@
 
 #$ -j y
 
-#$ -N HSAC_nOptions3_supervised_true_seed_7
+#$ -N HSAC_nOptions3_supervised_true
 
 #$ -V
 
@@ -16,4 +16,4 @@
 module load python3/3.8.10
 module load pytorch/1.9.0
 
-python main.py --number_options 3 --policy HSAC --seed 7 --pi_hi_supervised
+python main.py --number_options 3 --policy HSAC --pi_hi_supervised --seed $1 --HIL --load_HIL_model 

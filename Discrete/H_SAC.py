@@ -197,13 +197,13 @@ class H_SAC(object):
         pi_lo_loss.backward()
         self.pi_lo_optimizer[option].step()
         
-        alpha_loss = -(self.log_alpha[option] * (log_pi_state + self.target_entropy).detach()).mean()
+        # alpha_loss = -(self.log_alpha[option] * (log_pi_state + self.target_entropy).detach()).mean()
         
-        self.alpha_optim[option].zero_grad()
-        alpha_loss.backward()
-        self.alpha_optim[option].step()
+        # self.alpha_optim[option].zero_grad()
+        # alpha_loss.backward()
+        # self.alpha_optim[option].step()
         
-        self.alpha[option] = self.log_alpha[option].exp()
+        # self.alpha[option] = self.log_alpha[option].exp()
 
 		# Delayed policy updates actor-critic
         if self.total_it % self.critic_freq == 0:

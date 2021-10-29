@@ -113,13 +113,13 @@ class SAC(object):
         actor_loss.backward()
         self.actor_optimizer.step()
         
-        alpha_loss = -(self.log_alpha * (log_pi_state + self.target_entropy).detach()).mean()
+        # alpha_loss = -(self.log_alpha * (log_pi_state + self.target_entropy).detach()).mean()
         
-        self.alpha_optim.zero_grad()
-        alpha_loss.backward()
-        self.alpha_optim.step()
+        # self.alpha_optim.zero_grad()
+        # alpha_loss.backward()
+        # self.alpha_optim.step()
 
-        self.alpha = self.log_alpha.exp()
+        # self.alpha = self.log_alpha.exp()
 
         # Update the frozen target models
         if self.total_it % self.critic_freq == 0:

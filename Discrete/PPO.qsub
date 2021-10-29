@@ -6,16 +6,16 @@
 
 #$ -j y
 
-#$ -N PPO_HIL_True_Human_Traj_49_seed_7
+#$ -N PPO_HIL_True_Human_Trajs
 
 #$ -V
 
-#$ -pe omp 4
+#$ -pe omp 2
 #$ -l mem_per_core=4G
 
 module load python3/3.8.10
 module load pytorch/1.9.0
 
-python main.py --number_options 1 --policy PPO --seed 7 --HIL --load_HIL_model --load_HIL_model_expert_traj 49
+python main.py --number_options 1 --policy PPO --seed $1 --HIL --load_HIL_model --load_HIL_model_expert_traj $2
 
 
